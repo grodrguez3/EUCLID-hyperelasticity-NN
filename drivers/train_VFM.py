@@ -122,62 +122,56 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 				# Compute final stress (NN + correction)
 				P = P_NN + P_cor #P.shape:torch.Size([2752, 4]) 
-				#print(f'P.shape:{P.shape} ')
-				#print(f'data.gradNa:{data[0].gradNa.shape} ')
-				#print(f'data.x_nodes:{data.x_nodes.shape} ') #data.x_nodes:torch.Size([1441, 2]) 
-				
-				#print(f'data.dim:{dim} ')
-				
-				#Define VFs: 
-				
-				# Define shear virtual field
-				#v_x_star = data.x_nodes[:,1]
-				#v_y_star = data.x_nodes[:,0]
 
-			#	virtual_displacement = torch.stack([v_x_star, v_y_star], dim=1)  #torch.Size([1441, 2]) 
+				
+				#Define VFs : 
+				v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
+				v_y_star = data.x_nodes[:,1]*2
 
-				# Compute Virtual Strain Tensor (ξ*)
+				virtual_displacement = torch.stack([v_x_star, v_y_star], dim=1)  #torch.Size([1441, 2])
+
+				#Calculate gradient of virtual displacement
+				gradient_virtual_displacement = torch.stack([v_x_star, 2*v_x_star], dim=1)  #torch.Size([1441, 2])
+
 				num_nodes_per_element = 3  # Triangular elements
-				#xi_star = torch.zeros((data.numElements, dim, dim))  # Initialize virtual strain tensor
-
-
 				# compute internal forces on nodes
 				f_int_nodes = torch.zeros(data.numNodes,dim)
-				#ewk=f_int_nodes = torch.zeros(data.numNodes,dim)
-
-				#print(f'fint{f_int_nodes.shape}') #torch.Size([1441, 2])
+				ewk=torch.zeros(data.numNodes,dim)
+				iwk=torch.zeros(data.numNodes,dim)
 
 				for a in range(num_nodes_per_element): #this is 3
 					for i in range(dim): # dim is 2 	
 						for j in range(dim): #dim is 2
-							#xi_star[:, i, j] += 0.5 * (virtual_displacement[a, i] * data.gradNa[a][:, j] +
-                                                  # virtual_displacement[a, j] * data.gradNa[a][:, i]) #torch.Size([2752, 2, 2])
 
+							# # Mapping from **nodes to elements**
+							element_evf = gradient_virtual_displacement[data.connectivity[a]]  	
+							
+
+							external_virtual_work=P[:,voigt_map[i][j]] *element_evf[:,j]* data.qpWeights # Shape [2752]. I think qpweights is area, and because it is a planar surface it is also volume
+
+				
+							
 
 							force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights #torch.Size([2752])
-							
-							#ew=virtual_displacement
-							#ewk[:,i].index_add_(0,data.connectivity[a],ew)
+
+							# # Mapping from **elements to nodes**
 							f_int_nodes[:,i].index_add_(0,data.connectivity[a],force)
-				
-				# Compute Internal Virtual Work (IVW)
-
-				#print(f_int_nodes.shape) #2752
-
-				#P_matrix = P.view(-1, 2, 2)  # Convert from [2752, 4] to [2752, 2, 2]
-				#xi_star_P = xi_star * P_matrix  # Shape [2752, 2, 2]
-				#ivw_integrand = torch.sum(xi_star_P, dim=(1, 2))  # Shape [2752]
-				#ivw = torch.sum(data.qpWeights * ivw_integrand)  # Scalar result
-
-				#Principle of virtual work is over each element (1442)
+							ewk[:,i].index_add_(0,data.connectivity[a],external_virtual_work)
 
 
+							for reaction in data.reactions:
+								# # Mapping from **nodes to elements**
+								element_ivf = virtual_displacement[data.connectivity[a]] 
+
+								internal_virtual_work=reaction.force*element_ivf[:,j]* data.qpWeights
+
+								# # Mapping from **elements to nodes**
+								iwk[:,i].index_add_(0,data.connectivity[a],internal_virtual_work)
+								#We only know in boundary
+								iwk[~reaction.dofs]=0
+								print(reaction.dofs)
 
 
-
-
-				# Compute VFM Loss
-				#vfm_loss = (ivw - evw) ** 2			
 
 				# clone f_int_nodes
 				f_int_nodes_clone = f_int_nodes.clone()
@@ -187,17 +181,24 @@ def train_weak(model, datasets, fem_material, noise_level):
 				eqb_loss = torch.sum(f_int_nodes_clone**2)
 
 
-				#print(f_int_nodes[data.reactions[0].dofs].shape)	#29 
 				reaction_loss = torch.tensor([0.])
 				for reaction in data.reactions:
 					reaction_loss += (torch.sum(f_int_nodes[reaction.dofs]) - reaction.force)**2
 
-				return eqb_loss, reaction_loss
+				vf_loss=torch.sum(ewk-iwk)
+
+
+
+				return eqb_loss, reaction_loss, vf_loss
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets:
-				eqb_loss, reaction_loss = computeLosses(data, model)
-				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss
+				eqb_loss, reaction_loss, vf_loss = computeLosses(data, model)
+				print(f'VF loss:{vf_loss}')
+				print(f'eqb_loss loss:{eqb_loss}')
+				print(f'reaction_loss loss:{reaction_loss}')
+
+				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss
 
 			# back propagate
 			loss.backward()

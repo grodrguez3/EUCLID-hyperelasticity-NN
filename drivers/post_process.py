@@ -282,9 +282,9 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 			P_truth = torch.cat((dW_truth_dF11,dW_truth_dF12,dW_truth_dF21,dW_truth_dF22),dim=1)
 
 			# Define plot bounds
-			y_max_P = (torch.max(P_truth[:,P_idx])*1.1).detach().numpy()
+			y_max_P = (torch.max(P_truth[:,P_idx])*1.1).cpu().detach().numpy()
 			if y_max_P <= 0.:
-				y_min_P = (torch.min(P_truth[:,P_idx])*1.1).detach().numpy()
+				y_min_P = (torch.min(P_truth[:,P_idx])*1.1).cpu().detach().numpy()
 				y_max_P = 0.0
 			else:
 				y_min_P = 0.
@@ -331,28 +331,28 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 
 			if plot_quantity == 'P':
 				if path_count == 0:
-					accepted, = axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx,0].detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+					accepted, = axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx,0].cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 					if len(idx_best_models)>2:
-						axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx,-(len(idx_best_models)-1)::].detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+						axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx,-(len(idx_best_models)-1)::].cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 					else:
-						axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx,:1].detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+						axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx,:1].cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 				else:
-					axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx].detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+					axs[axs_i,axs_j].plot(gamma,P_accepted[:,P_idx].cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 
 				if P_rejected.shape[2] > 0:
 					if path_count == 0 :
-						rejected, = axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx,0].detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+						rejected, = axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx,0].cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 						if len(idx_worst_models)>2:
-							axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx,-(len(idx_worst_models)-1)::].detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+							axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx,-(len(idx_worst_models)-1)::].cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 						else:
-							axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx,:1].detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+							axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx,:1].cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 					else:
-						axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx].detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+						axs[axs_i,axs_j].plot(gamma,P_rejected[:,P_idx].cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 
 				if path_count == 0:
-					truth, = axs[axs_i,axs_j].plot(gamma,P_truth[:,P_idx].detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
+					truth, = axs[axs_i,axs_j].plot(gamma,P_truth[:,P_idx].cpu().detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
 				else:
-					axs[axs_i,axs_j].plot(gamma,P_truth[:,P_idx].detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
+					axs[axs_i,axs_j].plot(gamma,P_truth[:,P_idx].cpu().detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
 
 				if P_idx == 0:
 					axs[axs_i,axs_j].set_ylabel(strain_path+'\n'+r'$P_{11}(\gamma)$',fontsize=fs)
@@ -376,32 +376,32 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 
 			elif plot_quantity == 'W':
 
-				y_min_W = (torch.min(W_truth)).detach().numpy()
-				y_max_W = (torch.max(W_truth)*1.1).detach().numpy()
+				y_min_W = (torch.min(W_truth)).cpu().detach().numpy()
+				y_max_W = (torch.max(W_truth)*1.1).cpu().detach().numpy()
 
 				if path_count == 0:
-					accepted, = axs[axs_i,axs_j].plot(gamma,W_accepted[:,0].detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+					accepted, = axs[axs_i,axs_j].plot(gamma,W_accepted[:,0].cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 					if len(idx_best_models)>2:
-						axs[axs_i,axs_j].plot(gamma,W_accepted[:,-(len(idx_best_models)-1)::].detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+						axs[axs_i,axs_j].plot(gamma,W_accepted[:,-(len(idx_best_models)-1)::].cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 					else:
-						axs[axs_i,axs_j].plot(gamma,W_accepted[:,:1].detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+						axs[axs_i,axs_j].plot(gamma,W_accepted[:,:1].cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 				else:
-					axs[axs_i,axs_j].plot(gamma,W_accepted.detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
+					axs[axs_i,axs_j].plot(gamma,W_accepted.cpu().detach().numpy(), color=color_accepted, linestyle='--', lw=lw_best,alpha=alpha_best)
 
 				if W_rejected.shape[1] > 0:
 					if path_count == 0:
-						rejected, = axs[axs_i,axs_j].plot(gamma,W_rejected[:,0].detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+						rejected, = axs[axs_i,axs_j].plot(gamma,W_rejected[:,0].cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 						if len(idx_worst_models)>2:
-							axs[axs_i,axs_j].plot(gamma,W_rejected[:,-(len(idx_worst_models)-1)::].detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+							axs[axs_i,axs_j].plot(gamma,W_rejected[:,-(len(idx_worst_models)-1)::].cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 						else:
-							axs[axs_i,axs_j].plot(gamma,W_rejected[:,:1].detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+							axs[axs_i,axs_j].plot(gamma,W_rejected[:,:1].cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 					else:
-						axs[axs_i,axs_j].plot(gamma,W_rejected.detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
+						axs[axs_i,axs_j].plot(gamma,W_rejected.cpu().detach().numpy(), color=color_rejected, linestyle='dotted', lw=lw_worst,alpha=alpha_worst)
 
 				if path_count == 0:
-					truth, = axs[axs_i,axs_j].plot(gamma,W_truth.detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
+					truth, = axs[axs_i,axs_j].plot(gamma,W_truth.cpu().detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
 				else:
-					axs[axs_i,axs_j].plot(gamma,W_truth.detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
+					axs[axs_i,axs_j].plot(gamma,W_truth.cpu().detach().numpy(),color=color_truth,linestyle='-', lw=lw_truth)
 
 				axs[axs_i,axs_j].set_ylabel(strain_path+'\n'+r'$W(\mathbf{F}(\gamma))$',fontsize=fs)
 

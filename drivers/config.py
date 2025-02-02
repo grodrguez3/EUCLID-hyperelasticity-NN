@@ -1,12 +1,12 @@
 # Set to 0 to use GPU-accelerated training
-cuda = -1
+cuda = 0
 
 dim = 2
 num_nodes_per_element = 3
 voigt_map = [[0,1],[2,3]]
 
 fem_dir = '../fem-data/'
-output_dir = 'results'
+output_dir = '../results'
 
 # Dataset settings
 normalization_flag = False
@@ -32,7 +32,7 @@ eqb_loss_factor:                Factor to scale the force residuals at the free 
 reaction_loss_factor:           Factor to scale the force residuals at the fixed DoFs.
 verbose_frequency:              Prints the training progress every nth epoch.
 """
-ensemble_size = 30
+ensemble_size = 10
 random_init = True
 n_input = 3
 n_output = 1
@@ -42,7 +42,7 @@ dropout_rate = 0.2
 use_sftpSquared = True
 scaling_sftpSq = 1./12
 opt_method = 'adam'
-epochs = 500
+epochs = 20
 lr_schedule = 'cyclic'
 if lr_schedule == 'multistep':
     lr = 0.1
