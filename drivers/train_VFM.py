@@ -46,7 +46,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 		print('--------------------------------------------------------------------------------------------------------')
 	else:
 		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  | vfm |')
+		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  | vfm | ewk | iwk')
 		print('--------------------------------------------------------------------------------------------------------')
 
 
@@ -146,6 +146,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 
 				for a in range(num_nodes_per_element): #this is 3
+
+					# # Mapping from **nodes to elements**
 					element_evf = gradient_virtual_displacement[data.connectivity[a]]  
 					#print(P.shape)
 					#print(element_evf.shape)
@@ -207,11 +209,11 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 
 
-				return eqb_loss, reaction_loss, vf_loss
+				return eqb_loss, reaction_loss, vf_loss, torch.sum(ewk),torch.sum(iwk)
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets: #per loading step
-				eqb_loss, reaction_loss, vf_loss = computeLosses(data, model)
+				eqb_loss, reaction_loss, vf_loss, ewk,iwk = computeLosses(data, model)
 				#print(f'VF loss:{vf_loss}')
 				#print(f'eqb_loss loss:{eqb_loss}')
 				#print(f'reaction_loss loss:{reaction_loss}')
@@ -221,9 +223,9 @@ def train_weak(model, datasets, fem_material, noise_level):
 			# back propagate
 			loss.backward()
 
-			return loss, eqb_loss, reaction_loss, vf_loss
+			return loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk
 
-		loss, eqb_loss, reaction_loss, vf_loss = optimizer.step(closure)
+		loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk = optimizer.step(closure)
 		scheduler.step()
 
 
@@ -236,8 +238,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 					print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
 						epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(),torch.sigmoid(model.alpha)*180))
 			else:
-				print('| epoch %d/%d | %.1E | %.4E | %.4E  | %.4E | %.4E  ' % (
-					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(), vf_loss.item()))
+				print('| epoch %d/%d | %.1E | %.4E | %.4E  | %.4E | %.4E | %.4E | %.4E  ' % (
+					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(), vf_loss.item(), ewk.item(), iwk.item()))
 
 			loss_history.append([epoch_iter+1,loss.item()])
 
