@@ -46,7 +46,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 		print('--------------------------------------------------------------------------------------------------------')
 	else:
 		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |')
+		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  | vfm |')
 		print('--------------------------------------------------------------------------------------------------------')
 
 
@@ -124,52 +124,68 @@ def train_weak(model, datasets, fem_material, noise_level):
 				P = P_NN + P_cor #P.shape:torch.Size([2752, 4]) 
 
 				
-				#Define VFs : 
+				#Define VFs. For this case is an in plane deformation with vx=0, vy=x^2.  
 				v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
 				v_y_star = data.x_nodes[:,1]*2
+
+				#v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
+				#v_y_star = torch.zeros_like(data.x_nodes[:,1])*2 #torch.sin(np.pi * data.x_nodes[:,1]*0.5) 
 
 				virtual_displacement = torch.stack([v_x_star, v_y_star], dim=1)  #torch.Size([1441, 2])
 
 				#Calculate gradient of virtual displacement
-				gradient_virtual_displacement = torch.stack([v_x_star, 2*v_x_star], dim=1)  #torch.Size([1441, 2])
+				#gradient_virtual_displacement = torch.stack([v_x_star, torch.cos(np.pi * data.x_nodes[:,1]*0.5)*np.pi*0.5 ], dim=1)  #torch.Size([1441, 2])
+				gradient_virtual_displacement = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])
 
 				num_nodes_per_element = 3  # Triangular elements
 				# compute internal forces on nodes
 				f_int_nodes = torch.zeros(data.numNodes,dim)
-				ewk=torch.zeros(data.numNodes,dim)
-				iwk=torch.zeros(data.numNodes,dim)
+				internal_virtual_work=torch.zeros(data.numElements)
+				ewk=torch.zeros(data.numNodes)
+				iwk=torch.zeros(data.numNodes)
+
 
 				for a in range(num_nodes_per_element): #this is 3
+					element_evf = gradient_virtual_displacement[data.connectivity[a]]  
+					#print(P.shape)
+					#print(element_evf.shape)
+					external_virtual_work=(P * element_evf).sum(dim=1)* data.qpWeights
+					#(external_virtual_work.shape)
+					ewk.index_add_(0,data.connectivity[a],external_virtual_work)
+
+
+
 					for i in range(dim): # dim is 2 	
 						for j in range(dim): #dim is 2
 
 							# # Mapping from **nodes to elements**
-							element_evf = gradient_virtual_displacement[data.connectivity[a]]  	
+							#element_evf = gradient_virtual_displacement[data.connectivity[a]]  	
+
+							#external_virtual_work=P[:,voigt_map[i][j]] *element_evf[:,j]* data.qpWeights # Shape [2752]. I think qpweights is area, and because it is a planar surface it is also volume
 							
-
-							external_virtual_work=P[:,voigt_map[i][j]] *element_evf[:,j]* data.qpWeights # Shape [2752]. I think qpweights is area, and because it is a planar surface it is also volume
-
-				
-							
-
 							force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights #torch.Size([2752])
 
 							# # Mapping from **elements to nodes**
 							f_int_nodes[:,i].index_add_(0,data.connectivity[a],force)
-							ewk[:,i].index_add_(0,data.connectivity[a],external_virtual_work)
+							#ewk[:,i].index_add_(0,data.connectivity[a],external_virtual_work)
 
-
+							
 							for reaction in data.reactions:
 								# # Mapping from **nodes to elements**
 								element_ivf = virtual_displacement[data.connectivity[a]] 
 
-								internal_virtual_work=reaction.force*element_ivf[:,j]* data.qpWeights
+								#internal_virtual_work+=reaction.force*element_ivf[:,j]* data.qpWeights
+								internal_virtual_work+=reaction.force*element_ivf[:,1]* data.qpWeights
 
-								# # Mapping from **elements to nodes**
-								iwk[:,i].index_add_(0,data.connectivity[a],internal_virtual_work)
-								#We only know in boundary
-								iwk[~reaction.dofs]=0
-								print(reaction.dofs)
+							#We only know in boundary
+							#internal_virtual_work[~reaction.dofs]=0
+							# # Mapping from **elements to nodes**
+							#iwk[:,i].index_add_(0,data.connectivity[a],internal_virtual_work)
+							iwk.index_add_(0,data.connectivity[a],internal_virtual_work)	
+							#print(iwk.shape)
+							#print(reaction.dofs.shape)
+	
+							iwk[~reaction.dofs[:,1]]=0
 
 
 
@@ -185,6 +201,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 				for reaction in data.reactions:
 					reaction_loss += (torch.sum(f_int_nodes[reaction.dofs]) - reaction.force)**2
 
+				#print(f'EVW:{torch.sum(ewk)}')
+				#print(f'IVW:{torch.sum(iwk)}')
 				vf_loss=torch.sum(ewk-iwk)
 
 
@@ -192,20 +210,20 @@ def train_weak(model, datasets, fem_material, noise_level):
 				return eqb_loss, reaction_loss, vf_loss
 
 			# Compute loss for each displacement snapshot in dataset and add them together
-			for data in datasets:
+			for data in datasets: #per loading step
 				eqb_loss, reaction_loss, vf_loss = computeLosses(data, model)
-				print(f'VF loss:{vf_loss}')
-				print(f'eqb_loss loss:{eqb_loss}')
-				print(f'reaction_loss loss:{reaction_loss}')
+				#print(f'VF loss:{vf_loss}')
+				#print(f'eqb_loss loss:{eqb_loss}')
+				#print(f'reaction_loss loss:{reaction_loss}')
 
 				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss
 
 			# back propagate
 			loss.backward()
 
-			return loss, eqb_loss, reaction_loss
+			return loss, eqb_loss, reaction_loss, vf_loss
 
-		loss, eqb_loss, reaction_loss = optimizer.step(closure)
+		loss, eqb_loss, reaction_loss, vf_loss = optimizer.step(closure)
 		scheduler.step()
 
 
@@ -218,8 +236,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 					print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
 						epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(),torch.sigmoid(model.alpha)*180))
 			else:
-				print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E' % (
-					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item()))
+				print('| epoch %d/%d | %.1E | %.4E | %.4E  | %.4E | %.4E  ' % (
+					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(), vf_loss.item()))
 
 			loss_history.append([epoch_iter+1,loss.item()])
 
