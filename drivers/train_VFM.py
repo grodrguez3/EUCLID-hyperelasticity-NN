@@ -125,17 +125,24 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 				
 				#Define VFs. For this case is an in plane deformation with vx=0, vy=x^2.  
-				v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
+				#Incorrect VF
+				v_x_star = data.x_nodes[:,1]**2 #data.x_nodes[:,1]
 				v_y_star = data.x_nodes[:,1]*2
 
+				#Correct VF
 				#v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
-				#v_y_star = torch.zeros_like(data.x_nodes[:,1])*2 #torch.sin(np.pi * data.x_nodes[:,1]*0.5) 
+				#v_y_star = data.x_nodes[:,1]*2 #torch.sin(np.pi * data.x_nodes[:,1]*0.5) 
 
 				virtual_displacement = torch.stack([v_x_star, v_y_star], dim=1)  #torch.Size([1441, 2])
 
 				#Calculate gradient of virtual displacement
 				#gradient_virtual_displacement = torch.stack([v_x_star, torch.cos(np.pi * data.x_nodes[:,1]*0.5)*np.pi*0.5 ], dim=1)  #torch.Size([1441, 2])
-				gradient_virtual_displacement = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])
+				
+				#Correct VF
+				#gradient_virtual_displacement = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])
+				
+				#Incorrect VF
+				gradient_virtual_displacement = torch.stack([torch.zeros_like(v_y_star),data.x_nodes[:,1], 2*torch.ones_like(v_y_star) , data.x_nodes[:,1] ], dim=1)  #torch.Size([1441, 4])
 
 				num_nodes_per_element = 3  # Triangular elements
 				# compute internal forces on nodes
@@ -218,7 +225,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				#print(f'eqb_loss loss:{eqb_loss}')
 				#print(f'reaction_loss loss:{reaction_loss}')
 
-				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss
+				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss# (VF factor on uncertainty of automatically chosen VF)
 
 			# back propagate
 			loss.backward()
