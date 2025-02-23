@@ -11,9 +11,11 @@ from config import *
 initCUDA(cuda)
 #supporting files
 from model import *
-from train_VFM import *
+#from train_VFM import *
+from train import *
 from helper import *
 from post_process import *
+from post_process_compare import *
 
 datasets = []
 
@@ -94,8 +96,16 @@ for ensemble_iter in range(ensemble_size):
 print('\n\n=========================================================================================================================')
 print('Evaluating and plotting ICNN on standard strain paths.')
 evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
+evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Holzapfel')
+evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Ogden')
+evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='NeoHookean')
+evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='HainesWilson')
+evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Isihara')
+
+
+
 print('Completed.')
 print('\n\n=========================================================================================================================')
 print('Best model:')
-print(model.state_dict())
+#print(model.state_dict())
 print('=========================================================================================================================\n\n')

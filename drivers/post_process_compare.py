@@ -14,8 +14,10 @@ from matplotlib.ticker import FormatStrFormatter
 matplotlib.pyplot.rcParams['font.family'] = 'serif'
 matplotlib.pyplot.rcParams['mathtext.fontset'] = 'dejavuserif'
 
+#In this script I want to evaluate the model I trained against another model to see the predictive capabilities of the model.
+#To make it simple I am just going to force load another model 
 
-def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir):
+def evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against):
 
 	"""
 	Evaluates the trained model along six deformation paths and compares it to the ground truth model.
@@ -272,7 +274,7 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 			I1, I2, I3 = computeStrainInvariants(C)
 
 			#Get true model of fem_material
-			W_truth = get_true_W(fem_material,J,C,I1,I2,I3)
+			W_truth = get_true_W(compare_against,J,C,I1,I2,I3) #Force modify here, trained on Isihara see what happens with ogden 
 			print(f'True W dimensions: {W_truth.shape}')
 			print(f'Gamma steps: {gamma_steps}')
 			#print(f'True W: {W_truth}')
@@ -499,10 +501,10 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 				ax_polar.set_rticks([])
 				ax_polar.grid(True)
 
-			suptitle = fig.suptitle(fem_material,fontsize=15)
+			suptitle = fig.suptitle(fem_material + 'Against'+ compare_against,fontsize=15)
 			fig.tight_layout()
 
 			if plot_quantity == 'P':
-				matplotlib.pyplot.savefig(output_dir+'/models_'+fem_material+'_noise='+noise_level+'_Pij_.pdf',transparent=True,bbox_extra_artists=(lgd,suptitle,), bbox_inches='tight')
+				matplotlib.pyplot.savefig(output_dir+'/models_'+fem_material+'_noise='+noise_level+'_Pij_against' +compare_against+ '.pdf',transparent=True,bbox_extra_artists=(lgd,suptitle,), bbox_inches='tight')
 			elif plot_quantity == 'W':
-				matplotlib.pyplot.savefig(output_dir+'/models_'+fem_material+'_noise='+noise_level+'_W.pdf',transparent=True,bbox_extra_artists=(lgd,suptitle,), bbox_inches='tight')
+				matplotlib.pyplot.savefig(output_dir+'/models_'+fem_material+'_noise='+noise_level+'_W_against' +compare_against+ '.pdf',transparent=True,bbox_extra_artists=(lgd,suptitle,), bbox_inches='tight')
