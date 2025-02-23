@@ -309,9 +309,9 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 				model.load_state_dict(torch.load(output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth'))
 				if model.anisotropy_flag is not None:
 					if model.anisotropy_flag == 'single':
-						alpha_values[ensemble_iter] = torch.sigmoid(model.alpha).detach()*180
+						alpha_values[ensemble_iter] = torch.sigmoid(model.alpha).cpu().detach().numpy()*180
 					elif model.anisotropy_flag == 'double':
-						alpha_values[ensemble_iter] = torch.sigmoid(model.alpha).detach()*90
+						alpha_values[ensemble_iter] = torch.sigmoid(model.alpha).cpu().detach().numpy()*90
 
 				W_predictions[:,ensemble_iter:ensemble_iter+1], P_predictions[:,:,ensemble_iter:ensemble_iter+1] = compute_corrected_W(F)
 
@@ -433,8 +433,8 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 				elif fem_material == 'Holzapfel':
 					alpha_GT = 30*np.pi/180
 
-				alpha_accepted = alpha_values[idx_best_models]
-				alpha_rejected = alpha_values[idx_worst_models]
+				alpha_accepted = alpha_values[idx_best_models.cpu().detach().numpy()]
+				alpha_rejected = alpha_values[idx_worst_models.cpu().detach().numpy()]
 
 				theta_GT = alpha_GT*np.ones_like(x)
 				theta_HA = -alpha_GT*np.ones_like(x)
@@ -472,13 +472,19 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 						ax_polar.plot(-theta_accepted,x,lw=lw_best,color=color_accepted,alpha=alpha_best,ls='--')
 						ax_polar.plot(-theta_accepted+np.pi,x,lw=lw_best,color=color_accepted,alpha=alpha_best,ls='--')
 
-				if len(alpha_rejected.shape) > 0:
+				if len(alpha_rejected.shape) > 1: #changed to 1 because with zero it passes when alpha_rejected=[]
+					#print('here')
+					#print(alpha_rejected)
+					#print(len(alpha_rejected.shape))
 					for count,alpha_r in enumerate(alpha_rejected):
 						theta_rejected = alpha_r*np.pi/180*np.ones_like(x)
+						print(alpha_rejected)		
+
 					if count == 0:
 						ax_polar.plot(theta_rejected,x,label='Rejected',lw=lw_worst,color=color_rejected,alpha=alpha_worst,ls='dotted')
 						ax_polar.plot(theta_rejected+np.pi,x,lw=lw_worst,color=color_rejected,alpha=alpha_worst,ls='dotted')
 					else:
+						#print(theta_rejected)	
 						ax_polar.plot(theta_rejected,x,lw=lw_worst,color=color_rejected,alpha=alpha_worst,ls='dotted')
 						ax_polar.plot(theta_rejected+np.pi,x,lw=lw_worst,color=color_rejected,alpha=alpha_worst,ls='dotted')
 					if fem_material == 'Holzapfel':

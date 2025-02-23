@@ -1,0 +1,12 @@
+core/__pycache__/
+/results/
+/results_VFM/
+/results_orig/
+/results*/
+*.pyc
+*.png
+*.pdf
+*.pth
+*.csv
+*.pth
+*.pyc
