@@ -6,7 +6,7 @@ num_nodes_per_element = 3
 voigt_map = [[0,1],[2,3]]
 
 fem_dir = '../fem-data/'
-output_dir = '../results_15_25_VFM_bad/'
+output_dir = '../results_15_25_VFM_as_gNA/'
 
 # Dataset settings
 normalization_flag = False

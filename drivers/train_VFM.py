@@ -46,7 +46,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 		print('--------------------------------------------------------------------------------------------------------')
 	else:
 		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |   vfm   |  ewk   |   iwk  ')
+		print('| epoch x/xxx |   lr    |    loss    |     eqb    |	reaction	|  	 vfm 	  |  	ewk  	 |  	 iwk 	 ')
 		print('--------------------------------------------------------------------------------------------------------')
 
 
@@ -126,12 +126,12 @@ def train_weak(model, datasets, fem_material, noise_level):
 				
 				#Define VFs. For this case is an in plane deformation with vx=0, vy=x^2.  
 				#Incorrect VF
-				v_x_star = data.x_nodes[:,1]**2 #data.x_nodes[:,1]
-				v_y_star = data.x_nodes[:,1]*2
+				#v_x_star = data.x_nodes[:,1]**2 #data.x_nodes[:,1]
+				#v_y_star = data.x_nodes[:,1]*2
 
 				#Correct VF
-				#v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
-				#v_y_star = data.x_nodes[:,1]*2 #torch.sin(np.pi * data.x_nodes[:,1]*0.5) 
+				v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
+				v_y_star = data.x_nodes[:,1]*2 #torch.sin(np.pi * data.x_nodes[:,1]*0.5) 
 
 				virtual_displacement = torch.stack([v_x_star, v_y_star], dim=1)  #torch.Size([1441, 2])
 
@@ -139,10 +139,10 @@ def train_weak(model, datasets, fem_material, noise_level):
 				#gradient_virtual_displacement = torch.stack([v_x_star, torch.cos(np.pi * data.x_nodes[:,1]*0.5)*np.pi*0.5 ], dim=1)  #torch.Size([1441, 2])
 				
 				#Correct VF
-				#gradient_virtual_displacement = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])
+				gradient_virtual_displacement = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])
 				
 				#Incorrect VF
-				gradient_virtual_displacement = torch.stack([torch.zeros_like(v_y_star),data.x_nodes[:,1], 2*torch.ones_like(v_y_star) , data.x_nodes[:,1] ], dim=1)  #torch.Size([1441, 4])
+				#gradient_virtual_displacement = torch.stack([torch.zeros_like(v_y_star),data.x_nodes[:,1], 2*torch.ones_like(v_y_star) , data.x_nodes[:,1] ], dim=1)  #torch.Size([1441, 4])
 
 				num_nodes_per_element = 3  # Triangular elements
 				# compute internal forces on nodes
@@ -162,8 +162,6 @@ def train_weak(model, datasets, fem_material, noise_level):
 					#(external_virtual_work.shape)
 					ewk.index_add_(0,data.connectivity[a],external_virtual_work)
 
-
-
 					for i in range(dim): # dim is 2 	
 						for j in range(dim): #dim is 2
 
@@ -172,7 +170,10 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 							#external_virtual_work=P[:,voigt_map[i][j]] *element_evf[:,j]* data.qpWeights # Shape [2752]. I think qpweights is area, and because it is a planar surface it is also volume
 							
-							force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights #torch.Size([2752])
+							#force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights #torch.Size([2752])
+							#print(P[:,voigt_map[i][j]].shape)
+							force = P[:,voigt_map[i][j]] * element_evf [:,voigt_map[i][j]]* data.qpWeights #torch.Size([2752])
+							
 
 							# # Mapping from **elements to nodes**
 							f_int_nodes[:,i].index_add_(0,data.connectivity[a],force)
@@ -212,15 +213,16 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 				#print(f'EVW:{torch.sum(ewk)}')
 				#print(f'IVW:{torch.sum(iwk)}')
-				vf_loss=torch.sum(ewk-iwk)
+				vf_loss=torch.sum(ewk-iwk)**2
 
 
 
-				return eqb_loss, reaction_loss, vf_loss, torch.sum(ewk),torch.sum(iwk)
+				return  eqb_loss, reaction_loss, vf_loss, torch.sum(ewk),torch.sum(iwk)
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets: #per loading step
 				eqb_loss, reaction_loss, vf_loss, ewk,iwk = computeLosses(data, model)
+				#vf_loss, ewk,iwk = computeLosses(data, model)
 				#print(f'VF loss:{vf_loss}')
 				#print(f'eqb_loss loss:{eqb_loss}')
 				#print(f'reaction_loss loss:{reaction_loss}')
@@ -233,6 +235,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 			return loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk
 
 		loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk = optimizer.step(closure)
+		#loss,vf_loss, ewk,iwk = optimizer.step(closure)
 		scheduler.step()
 
 

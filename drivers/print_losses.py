@@ -15,10 +15,10 @@ matplotlib.pyplot.rcParams['font.family'] = 'serif'
 matplotlib.pyplot.rcParams['mathtext.fontset'] = 'dejavuserif'
 
 ensemble_size=15
-fem_material="Isihara"
+fem_material="NeoHookean"
 noise_level="high"
 epochs=25
-output_dir = '../results_VFM_15_25'
+output_dir = '../results_15_25_VFM'
 
 
 final_losses = torch.zeros((ensemble_size,1))
@@ -33,8 +33,10 @@ print(f'Average of final losses: {torch.mean(final_losses): .3f}')
 plt.figure(figsize=(8, 5))
 
 # Plot each model’s loss per epoch
-for i in range(1,ensemble_size):
-    plt.plot(all_losses[i], label=f"Model {i}")
+for i in range(ensemble_size):
+    if i ==11:
+        continue
+    plt.plot(all_losses[i,20:], label=f"Model {i}")
 
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
