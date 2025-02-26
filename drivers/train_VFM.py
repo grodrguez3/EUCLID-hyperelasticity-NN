@@ -123,6 +123,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 				# Compute final stress (NN + correction)
 				P = P_NN + P_cor #P.shape:torch.Size([2752, 4]) 
 
+				energy_loss = torch.abs(torch.mean(P)) #test strong from of eq 
+
 				
 				#Define VFs. For this case is an in plane deformation with vx=0, vy=x^2.  
 				#Incorrect VF
@@ -217,7 +219,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 
 
-				return  eqb_loss, reaction_loss, vf_loss, torch.sum(ewk),torch.sum(iwk)
+				return  eqb_loss, reaction_loss, energy_loss, torch.sum(ewk),torch.sum(iwk) #vf_loss, torch.sum(ewk),torch.sum(iwk)
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets: #per loading step
@@ -227,7 +229,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				#print(f'eqb_loss loss:{eqb_loss}')
 				#print(f'reaction_loss loss:{reaction_loss}')
 
-				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss# (VF factor on uncertainty of automatically chosen VF)
+				loss += vf_loss #eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss# (VF factor on uncertainty of automatically chosen VF)
 
 			# back propagate
 			loss.backward()

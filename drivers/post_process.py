@@ -271,8 +271,13 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 			#computing strain invariants
 			I1, I2, I3 = computeStrainInvariants(C)
 
+			
+
 			#Get true model of fem_material
 			W_truth = get_true_W(fem_material,J,C,I1,I2,I3)
+			print(f'F shape {F.shape}')
+			print(f'J shape {J.shape}')
+			#print(I1)
 			print(f'True W dimensions: {W_truth.shape}')
 			print(f'Gamma steps: {gamma_steps}')
 			#print(f'True W: {W_truth}')

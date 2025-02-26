@@ -111,6 +111,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 				# Compute final stress (NN + correction)
 				P = P_NN + P_cor
 
+				energy_loss = torch.abs(torch.mean(P)) #test strong from of eq 
+
 				# compute internal forces on nodes
 				f_int_nodes = torch.zeros(data.numNodes,dim)
 				for a in range(num_nodes_per_element):
