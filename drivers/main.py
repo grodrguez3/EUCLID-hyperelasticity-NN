@@ -10,8 +10,8 @@ from config import *
 #CUDA
 initCUDA(cuda)
 #supporting files
-from model import *
-from train_VFM import *
+from model2 import *
+from train import *
 #from train import *
 from helper import *
 from post_process import *

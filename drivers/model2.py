@@ -6,6 +6,27 @@ from core import *
 import config as c
 
 
+
+
+
+
+def W_from_model(y,K1,K2,K3):
+	'''
+	y is a vector of outputs containing the predicted parameters
+	Ks are the invariant terms (see paper but for instance K1=(I1tilde - 3))
+	
+    Returns:
+        W   : The computed strain energy density.
+
+	Currently only for NeoHookean (or Mooney–Rivlin really because C01=0. 
+	Then y[0] is predicting C1 and y[1] should be predicting D1
+	'''
+
+    # Compute the energy as a weighted sum of the terms.
+	W = y[0]*K1 + y[1]*K3
+	return W	
+
+
 class convexLinear(torch.nn.Module):
 	"""
 
@@ -106,7 +127,7 @@ class ICNN(torch.nn.Module):
 			Ib = torch.cos(beta)*(C11*torch.cos(beta)+C12*torch.sin(beta)) + torch.sin(beta)*(C21*torch.cos(beta)+C22*torch.sin(beta))
 
 		# Apply transformation to invariants
-		K1 = I1 * torch.pow(I3,-1./3.) - 3.0
+		K1 = I1 * torch.pow(I3,-1./3.) - 3.0 # I think this is wrong it shoudl be 2/3
 		K2 = (I1 + I3 - 1.) * torch.pow(I3,-2./3.) - 3.0
 		J = torch.sqrt(I3)
 		K3 = (J-1.)**2
@@ -139,6 +160,8 @@ class ICNN(torch.nn.Module):
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
 		y = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
+		print(f'values of {y}')
+		y=W_from_model(y,K1,K2,K3)		
 		return y
 
 def init_weights(m):
