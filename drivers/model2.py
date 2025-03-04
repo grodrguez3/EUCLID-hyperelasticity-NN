@@ -23,7 +23,18 @@ def W_from_model(y,K1,K2,K3):
 	'''
 
     # Compute the energy as a weighted sum of the terms.
-	W = y[0]*K1 + y[1]*K3
+	#print(f'Shape of K3: {K3.shape}')
+
+	#NeoHookean
+	#W = y[0,0]*K1 + y[0,1]*K3
+	#Isihara
+	#W = y[0,0]*K1 + y[0,1]*K2 + y[0,2]*K2**2 + y[0,3]*K3 #Isihara, if we train on NeoHookean both accompanying K2 should dissapear. IT DOES!
+	#Haynes Wilson
+	#W = y[0,0]*K1 + y[0,1]*K2 + y[0,2]*K1*K2 +  +y[0,3]*K1**3+  y[0,4]*K2**2 + y[0,5]*K3 #Haynes Wilson, if we train on NeoHookean only y[0,1] and y[0,5] should show
+	#Gent-Thomas
+	W = y[0,0]*K1 + y[0,1]*K2 + y[0,2]*K1*K2 +  +y[0,3]*K1**3+  y[0,4]*K2**2 + y[0,5]*K3 + y[0,6]*torch.log((K2 + 3) / 3)#Gent-Thomas, if we train on NeoHookean only y[0,1] and y[0,5] should show
+
+
 	return W	
 
 
@@ -50,7 +61,7 @@ class convexLinear(torch.nn.Module):
 		w_times_x= torch.mm(x, torch.nn.functional.softplus(self.weights.t()))
 		return w_times_x
 
-class ICNN(torch.nn.Module):
+class ICNN3(torch.nn.Module):
 	"""
 
 	Material model based on Input convex neural network.
@@ -68,8 +79,13 @@ class ICNN(torch.nn.Module):
 	Output: 			NN-based strain energy density (W_NN)
 
 	"""
+	_printed_message = False
+
 	def __init__(self, n_input, n_hidden, n_output, use_dropout, dropout_rate, anisotropy_flag=None, fiber_type=None):
-		super(ICNN, self).__init__()
+		super(ICNN3, self).__init__()
+		if not ICNN3._printed_message:
+			print("Here model 2")
+			ICNN3._printed_message=True
 		# Create Module dicts for the hidden and skip-connection layers
 		self.layers = torch.nn.ModuleDict()
 		self.skip_layers = torch.nn.ModuleDict()
@@ -127,7 +143,7 @@ class ICNN(torch.nn.Module):
 			Ib = torch.cos(beta)*(C11*torch.cos(beta)+C12*torch.sin(beta)) + torch.sin(beta)*(C21*torch.cos(beta)+C22*torch.sin(beta))
 
 		# Apply transformation to invariants
-		K1 = I1 * torch.pow(I3,-1./3.) - 3.0 # I think this is wrong it shoudl be 2/3
+		K1 = I1 * torch.pow(I3,-1./3.) - 3.0 
 		K2 = (I1 + I3 - 1.) * torch.pow(I3,-2./3.) - 3.0
 		J = torch.sqrt(I3)
 		K3 = (J-1.)**2
@@ -159,10 +175,13 @@ class ICNN(torch.nn.Module):
 			if self.training:
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
-		y = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
-		print(f'values of {y}')
-		y=W_from_model(y,K1,K2,K3)		
-		return y
+		params = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
+
+		params = torch.mean(params, dim=0, keepdim=True)
+		#print(f'values of y {y}')
+		#print(f'shape of {y.shape}')
+		y=W_from_model(params,K1,K2,K3)		
+		return y, params
 
 def init_weights(m):
 	if isinstance(m, torch.nn.Linear):

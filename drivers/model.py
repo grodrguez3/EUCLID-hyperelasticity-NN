@@ -49,6 +49,7 @@ class ICNN(torch.nn.Module):
 	"""
 	def __init__(self, n_input, n_hidden, n_output, use_dropout, dropout_rate, anisotropy_flag=None, fiber_type=None):
 		super(ICNN, self).__init__()
+
 		# Create Module dicts for the hidden and skip-connection layers
 		self.layers = torch.nn.ModuleDict()
 		self.skip_layers = torch.nn.ModuleDict()

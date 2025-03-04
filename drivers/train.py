@@ -76,7 +76,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 				F22.requires_grad = True
 
 				# Forward pass NN to obtain W_NN
-				W_NN = model(torch.cat((F11,F12,F21,F22),dim=1))
+				#print("Estimation of W_NN")
+				W_NN, params = model(torch.cat((F11,F12,F21,F22),dim=1)) #shape of torch.Size([2752, 1])
 
 				# Get gradients of W w.r.t F
 				dW_NN_dF11 = torch.autograd.grad(W_NN,F11,torch.ones(F11.shape[0],1),create_graph=True)[0]
@@ -88,7 +89,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 				P_NN = torch.cat((dW_NN_dF11,dW_NN_dF12,dW_NN_dF21,dW_NN_dF22),dim=1)
 
 				# Forward pass to obtain zero deformation energy correction
-				W_NN_0 = model(torch.cat((F11_0,F12_0,F21_0,F22_0),dim=1))
+				#print("Estimation of W_NN_0")
+				W_NN_0, _ = model(torch.cat((F11_0,F12_0,F21_0,F22_0),dim=1)) #shape of torch.Size([1, 1])
 
 				# Get gradients of W_NN_0 w.r.t F
 				dW_NN_dF11_0 = torch.autograd.grad(W_NN_0,F11_0,torch.ones(F11_0.shape[0],1),create_graph=True)[0]
@@ -111,7 +113,6 @@ def train_weak(model, datasets, fem_material, noise_level):
 				# Compute final stress (NN + correction)
 				P = P_NN + P_cor
 
-				energy_loss = torch.abs(torch.mean(P)) #test strong from of eq 
 
 				# compute internal forces on nodes
 				f_int_nodes = torch.zeros(data.numNodes,dim)
@@ -132,20 +133,22 @@ def train_weak(model, datasets, fem_material, noise_level):
 				for reaction in data.reactions:
 					reaction_loss += (torch.sum(f_int_nodes[reaction.dofs]) - reaction.force)**2
 
-				return eqb_loss, reaction_loss
+				return  eqb_loss, reaction_loss, params
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets:
-				eqb_loss, reaction_loss = computeLosses(data, model)
+				eqb_loss, reaction_loss, params = computeLosses(data, model)
 				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss
 
 			# back propagate
 			loss.backward()
 
-			return loss, eqb_loss, reaction_loss
+			return loss, eqb_loss, reaction_loss, params
 
-		loss, eqb_loss, reaction_loss = optimizer.step(closure)
+		loss, eqb_loss, reaction_loss, params = optimizer.step(closure)
 		scheduler.step()
+		#if epoch_iter==25:
+		#	print(params)
 
 
 		if(epoch_iter % verbose_frequency == 0):
@@ -160,6 +163,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E' % (
 					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item()))
 
+			
 			loss_history.append([epoch_iter+1,loss.item()])
 
-	return model, loss_history
+	return model, loss_history, params

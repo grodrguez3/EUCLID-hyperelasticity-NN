@@ -17,40 +17,48 @@ from helper import *
 from post_process_param import *
 #from post_process_compare ismport *
 
+#Modified script to train each network on several samples
+
+
 datasets = []
 
-fem_material = sys.argv[1]
-noise_level = sys.argv[2]
+fem_materials = sys.argv[1:-1]
+noise_level = sys.argv[-1]
 
-loadsteps = []
-if 'NeoHookean' in fem_material:
-    loadsteps = [10,20,30]
-elif 'Ogden' in fem_material:
-    loadsteps = [5,10,15,20,25,30]
-elif 'GentThomas' in fem_material:
-    loadsteps = [10,20,30]
-elif 'ArrudaBoyce' in fem_material:
-    loadsteps = [5,10,15,20,25,30,35,40,45,50]
-elif 'Anisotropy'  in fem_material:
-    loadsteps = [5,10,15,20,25,30,35,40]
-elif 'Holzapfel' in fem_material:
-    loadsteps = [5,10,15,20,25,30,35,40]
-else:
-    loadsteps = [10,20,30,40,50,60,70,80]
+# Dictionary to store FEM materials and their corresponding load steps
+material_loadsteps = {}
+
+for fem_material in fem_materials:
+    if 'NeoHookean' in fem_material:
+        material_loadsteps[fem_material] = [10, 20, 30]
+    elif 'Ogden' in fem_material:
+        material_loadsteps[fem_material] = [5, 10, 15, 20, 25, 30]
+    elif 'GentThomas' in fem_material:
+        material_loadsteps[fem_material] = [10, 20, 30]
+    elif 'ArrudaBoyce' in fem_material:
+        material_loadsteps[fem_material] = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+    elif 'Anisotropy' in fem_material:
+        material_loadsteps[fem_material] = [5, 10, 15, 20, 25, 30, 35, 40]
+    elif 'Holzapfel' in fem_material:
+        material_loadsteps[fem_material] = [5, 10, 15, 20, 25, 30, 35, 40]
+    else:
+        material_loadsteps[fem_material] = [10, 20, 30, 40, 50, 60, 70, 80]
+
 
 #=====================================================================
 # DATA:
 #=====================================================================
-for loadstep in loadsteps:
+datasets = []
 
-    data_path = get_data_path(fem_dir, fem_material,
-                              noise_level, loadstep)
+for fem_material, loadsteps in material_loadsteps.items():
+    for loadstep in loadsteps:
+        data_path = get_data_path(fem_dir, fem_material, noise_level, loadstep)
 
-    data = loadFemData(data_path,
-                       noiseLevel = additional_noise,
-                       noiseType = 'displacement')
+        data = loadFemData(data_path,
+                           noiseLevel=additional_noise,
+                           noiseType='displacement')
 
-    datasets.append(data)
+        datasets.append(data)
 
 if 'Holzapfel' in fem_material:
     model = ICNN(n_input=n_input+2,
@@ -87,11 +95,15 @@ print('Training an ensemble of models...\n')
 params_all_models=[]
 for ensemble_iter in range(ensemble_size):
     print('\nTraining model '+str(ensemble_iter+1)+' out of '+str(ensemble_size)+'.\n')
-    model, loss_history, params = train_weak(model, datasets, fem_material, noise_level)
-    params_all_models.append(params)
-    os.makedirs(output_dir+'/'+fem_material+'/',exist_ok=True)
-    torch.save(model.state_dict(), output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')
-    exportList(output_dir+'/'+fem_material+'/','loss_history_noise='+noise_level+'_ID='+str(ensemble_iter),loss_history)
+    
+    for fem_material in fem_materials: #Check that the model not always expects the same order. I think it does not matter because each is a new model. 
+ 
+        model, loss_history, params = train_weak(model, datasets, fem_material, noise_level)
+        params_all_models.append(params)
+        os.makedirs(output_dir+'/'+fem_material+'/',exist_ok=True)
+        torch.save(model.state_dict(), output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')
+        exportList(output_dir+'/'+fem_material+'/','loss_history_noise='+noise_level+'_ID='+str(ensemble_iter),loss_history)
+    
     model.apply(init_weights)
     if model.anisotropy_flag is not None:
         model.alpha = torch.nn.Parameter(torch.randn(1,1))
