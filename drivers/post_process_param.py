@@ -219,7 +219,7 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 			W_truth = 0.5*(I1_tilde-3) + 1.0*(J-1)**2 + HAa + HAb
 
 		return W_truth
-
+	bprint=1
 	for plot_quantity in plot_quantities:
 
 		fig, axs = matplotlib.pyplot.subplots(3,3)
@@ -231,8 +231,9 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 
 		axs_i = 0
 		axs_j = 0
-
+		
 		for path_count, strain_path in enumerate(strain_paths):
+			
 			if strain_path == 'UT':
 				P_idx = 0
 			elif strain_path == 'SS':
@@ -308,16 +309,17 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 
 				idx_best_models = torch.topk(-final_losses.flatten(),num_models_keep).indices
 				idx_worst_models = torch.topk(final_losses.flatten(),num_models_remove).indices
-
-			print(f'The best model predicted: {params[idx_best_models[0]]}')
-			print(f'The worst model predicted: {params[idx_worst_models[0]]}')
+			if bprint:
+				print(f'The best model predicted: {params[idx_best_models[0]]}')
+				print(f'The worst model predicted: {params[idx_worst_models[0]]}')
+				bprint=0
 
 			W_predictions = torch.zeros((gamma_steps,ensemble_size))
 			P_predictions = torch.zeros((gamma_steps,4,ensemble_size))
 
 			alpha_values = np.zeros(ensemble_size)
 			for ensemble_iter in range(ensemble_size):
-				model.load_state_dict(torch.load(output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')) # I think change this 
+				model.load_state_dict(torch.load(output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth',weights_only=True)) # I think change this 
 				if model.anisotropy_flag is not None:
 					if model.anisotropy_flag == 'single':
 						alpha_values[ensemble_iter] = torch.sigmoid(model.alpha).cpu().detach().numpy()*180

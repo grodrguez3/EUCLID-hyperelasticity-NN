@@ -6,7 +6,7 @@ num_nodes_per_element = 3
 voigt_map = [[0,1],[2,3]]
 
 fem_dir = '../fem-data/'
-output_dir = '../predictParams_GTEq_6params/'
+output_dir = '../trainmultiple/'
 
 # Dataset settings
 normalization_flag = False
@@ -35,7 +35,7 @@ verbose_frequency:              Prints the training progress every nth epoch.
 ensemble_size = 30
 random_init = True
 n_input = 3
-n_output = 7
+n_output = 6
 n_hidden = [64,64,64]
 use_dropout = True
 dropout_rate = 0.2

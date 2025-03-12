@@ -92,14 +92,15 @@ if(random_init):
 print('\n\n====================================================================')
 print('Beginning training\n')
 print('Training an ensemble of models...\n')
-params_all_models=[]
+params_all_models={}
+params_all_models = {fem_material: [] for fem_material in fem_materials}
 for ensemble_iter in range(ensemble_size):
     print('\nTraining model '+str(ensemble_iter+1)+' out of '+str(ensemble_size)+'.\n')
     
     for fem_material in fem_materials: #Check that the model not always expects the same order. I think it does not matter because each is a new model. 
- 
+        print(f'\nTraining model {ensemble_iter+1} on {fem_material}.\n')
         model, loss_history, params = train_weak(model, datasets, fem_material, noise_level)
-        params_all_models.append(params)
+        params_all_models[fem_material].append(params)
         os.makedirs(output_dir+'/'+fem_material+'/',exist_ok=True)
         torch.save(model.state_dict(), output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')
         exportList(output_dir+'/'+fem_material+'/','loss_history_noise='+noise_level+'_ID='+str(ensemble_iter),loss_history)
@@ -112,7 +113,9 @@ print("Final Estimated Parameters:")
 #print(params_all_models)
 #print('Evaluating and plotting ICNN on standard strain paths.')
 #evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
-evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir, params_all_models)
+for fem_material in fem_materials: #Check that the model not always expects the same order. I think it does not matter because each is a new model. 
+    print(f'\n Evaluating model on {fem_material}.\n')
+    evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir, params_all_models[fem_material])
 #evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Holzapfel')
 #evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Ogden')
 #evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='NeoHookean')
