@@ -175,12 +175,15 @@ class ICNN3(torch.nn.Module):
 			if self.training:
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
+					
 		params = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
 
 		params = torch.mean(params, dim=0, keepdim=True)
 		#print(f'values of y {y}')
 		#print(f'shape of {y.shape}')
-		y=W_from_model(params,K1,K2,K3)		
+
+		y=W_from_model(params,K1,K2,K3)
+
 		return y, params
 
 def init_weights(m):
