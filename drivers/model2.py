@@ -26,11 +26,14 @@ def W_from_model(y,K1,K2,K3):
 	#print(f'Shape of K3: {K3.shape}')
 
 	#NeoHookean
+	#if c.equation=="NeoHookean": 
 	#W = y[0,0]*K1 + y[0,1]*K3
 	#Isihara
 	#W = y[0,0]*K1 + y[0,1]*K2 + y[0,2]*K2**2 + y[0,3]*K3 #Isihara, if we train on NeoHookean both accompanying K2 should dissapear. IT DOES!
 	#Haynes Wilson
-	W = y[0,0]*K1 + y[0,1]*K2 + y[0,2]*K1*K2 +  +y[0,3]*K1**3+  y[0,4]*K2**2 + y[0,5]*K3 #Haynes Wilson, if we train on NeoHookean only y[0,1] and y[0,5] should show
+	if c.equation=="Haines-Wilson":
+		W = y[0,0]*K1 + y[0,1]*K2 + y[0,2]*K1*K2 +  +y[0,3]*K1**3+  y[0,4]*K2**2 + y[0,5]*K3 #Haynes Wilson, if we train on NeoHookean only y[0,1] and y[0,5] should show
+	
 	#Gent-Thomas
 	#W = y[0,0]*K1 + y[0,1]*K2 + y[0,2]*K1*K2 +  +y[0,3]*K1**3+  y[0,4]*K2**2 + y[0,5]*K3 + y[0,6]*torch.log((K2 + 3) / 3)#Gent-Thomas, if we train on NeoHookean only y[0,1] and y[0,5] should show
 
@@ -175,7 +178,7 @@ class ICNN3(torch.nn.Module):
 			if self.training:
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
-					
+
 		params = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
 
 		params = torch.mean(params, dim=0, keepdim=True)

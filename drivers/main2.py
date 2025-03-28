@@ -17,13 +17,54 @@ from helper import *
 from post_process_param import *
 #from post_process_compare ismport *
 
+
+
+import os
+import logging
+from datetime import datetime
+import config
 #Modified script to train each network on several samples
+#########Logging############
+# Ensure the output directory exists
+os.makedirs(output_dir, exist_ok=True)
+
+# Create a log filename with a timestamp, saved in the output directory
+log_filename = os.path.join(output_dir, datetime.now().strftime("experiment_%Y%m%d_%H%M%S.log"))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s]: %(message)s",
+    handlers=[
+        logging.FileHandler(log_filename),
+        logging.StreamHandler()  # Prints to console as well
+    ]
+)
+logging.info("Training each network on several models (NeoHookean, Isihara, Haynes Wilson).")
+
+
+logging.info("Starting experiment run in main.py.")
+
+
+logging.info("Logging configuration settings from config.py:")
+
+# List of config attributes to log
+attributes_to_log = ['ensemble_size', 'epochs', 'n_input', 'n_output', 'n_hidden', 'output_dir']
+
+logging.info("Logging selected configuration settings from config.py:")
+for attr in attributes_to_log:
+    if hasattr(config, attr):
+        value = getattr(config, attr)
+        logging.info(f"{attr} = {value}")
+    else:
+        logging.warning(f"Attribute {attr} not found in config")
 
 
 datasets = []
 
 fem_materials = sys.argv[1:-1]
 noise_level = sys.argv[-1]
+logging.info(f"The data for training is from {fem_materials} with noise level {noise_level} . We are outputting {n_output} parameters.")
+
 
 # Dictionary to store FEM materials and their corresponding load steps
 material_loadsteps = {}
@@ -44,6 +85,9 @@ for fem_material in fem_materials:
     else:
         material_loadsteps[fem_material] = [10, 20, 30, 40, 50, 60, 70, 80]
 
+    logging.info(f"fem_material: {fem_material}")
+    #logging.info(f"noise_level: {noise_level}")
+    logging.info(f"loadsteps: {material_loadsteps[fem_material] }")
 
 #=====================================================================
 # DATA:
@@ -82,6 +126,8 @@ else:
                  use_dropout=use_dropout,
                  dropout_rate=dropout_rate)
 
+logging.info("Model architecture:")
+logging.info(model)
 
 print_model_arch(model)
 
@@ -114,8 +160,11 @@ print("Final Estimated Parameters:")
 #print('Evaluating and plotting ICNN on standard strain paths.')
 #evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 for fem_material in fem_materials: #Check that the model not always expects the same order. I think it does not matter because each is a new model. 
-    print(f'\n Evaluating model on {fem_material}.\n')
+    #print(f'\n Evaluating model on {fem_material}.\n')
+    logging.info(f"Evaluating mixture model on: {fem_material}.")
     evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir, params_all_models[fem_material])
+
+
 #evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Holzapfel')
 #evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Ogden')
 #evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='NeoHookean')

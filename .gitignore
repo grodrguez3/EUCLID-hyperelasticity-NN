@@ -10,3 +10,4 @@ core/__pycache__/
 *.csv
 *.pth
 *.pyc
+*.log

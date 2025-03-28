@@ -10,6 +10,7 @@ initCUDA(cuda)
 from model import *
 from helper import *
 from matplotlib.ticker import FormatStrFormatter
+import logging
 
 matplotlib.pyplot.rcParams['font.family'] = 'serif'
 matplotlib.pyplot.rcParams['mathtext.fontset'] = 'dejavuserif'
@@ -310,8 +311,10 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 				idx_best_models = torch.topk(-final_losses.flatten(),num_models_keep).indices
 				idx_worst_models = torch.topk(final_losses.flatten(),num_models_remove).indices
 			if bprint:
-				print(f'The best model predicted: {params[idx_best_models[0]]}')
-				print(f'The worst model predicted: {params[idx_worst_models[0]]}')
+				#print(f'The best model predicted: {params[idx_best_models[0]]}')
+				#print(f'The worst model predicted: {params[idx_worst_models[0]]}')
+				logging.info(f"The best model predicted: {params[idx_best_models[0]]}")
+				logging.info(f"The worst model predicted: {params[idx_worst_models[0]]}")		
 				bprint=0
 
 			W_predictions = torch.zeros((gamma_steps,ensemble_size))
