@@ -24,6 +24,7 @@ import config
 
 #########Logging############
 # Ensure the output directory exists
+
 os.makedirs(output_dir, exist_ok=True)
 
 # Create a log filename with a timestamp, saved in the output directory

@@ -50,7 +50,7 @@ logging.info("Logging configuration settings from config.py:")
 # List of config attributes to log
 attributes_to_log = ['ensemble_size', 'epochs', 'n_input', 'n_output', 'n_hidden', 'output_dir']
 
-logging.info("Logging selected configuration settings from config.py:")
+logging.info("Logging selected config_mixtureuration settings from config.py:")
 for attr in attributes_to_log:
     if hasattr(config, attr):
         value = getattr(config, attr)
@@ -125,6 +125,9 @@ else:
                  n_output=n_output,
                  use_dropout=use_dropout,
                  dropout_rate=dropout_rate)
+    
+    logging.info("\n".join(f"{name}: {param.shape}" for name, param in model.named_parameters()))
+
 
 logging.info("Model architecture:")
 logging.info(model)

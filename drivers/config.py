@@ -6,7 +6,7 @@ num_nodes_per_element = 3
 voigt_map = [[0,1],[2,3]]
 
 fem_dir = '../fem-data/'
-output_dir = '../results_predict_params/'
+output_dir = '../predict_parameters/'
 
 # Dataset settings
 normalization_flag = False
@@ -37,6 +37,8 @@ random_init = True
 n_input = 3
 n_output = 6
 n_hidden = [64,64,64]
+#n_hidden = [128,128,128]
+#n_hidden = [64, 128, 256, 256, 128, 64]
 equation="Haines-Wilson"
 use_dropout = True
 dropout_rate = 0.2

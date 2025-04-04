@@ -5,7 +5,6 @@ from core import *
 #config
 import config as c
 
-
 #Modified script to output several parameters and calculate strain energy from output parameters
 
 
