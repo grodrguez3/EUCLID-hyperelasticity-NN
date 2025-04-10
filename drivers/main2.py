@@ -11,7 +11,7 @@ from config import *
 initCUDA(cuda)
 #supporting files
 from model2 import *
-from train_VFM import *
+from train import *
 #from train import *
 from helper import *
 from post_process_param import *
@@ -23,6 +23,7 @@ import os
 import logging
 from datetime import datetime
 import config
+
 #Modified script to train each network on several samples
 #########Logging############
 # Ensure the output directory exists
@@ -148,7 +149,8 @@ for ensemble_iter in range(ensemble_size):
     
     for fem_material in fem_materials: #Check that the model not always expects the same order. I think it does not matter because each is a new model. 
         print(f'\nTraining model {ensemble_iter+1} on {fem_material}.\n')
-        model, loss_history, params = train_weak(model, datasets, fem_material, noise_level)
+        model, loss_history, params = train_weak_VFM(model, datasets, fem_material, noise_level)
+        #print(params)
         params_all_models[fem_material].append(params)
         os.makedirs(output_dir+'/'+fem_material+'/',exist_ok=True)
         torch.save(model.state_dict(), output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')
