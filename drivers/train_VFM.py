@@ -1,6 +1,9 @@
 from core import *
 from config import *
+import logging
 
+
+logging.info(f"USING VFM SCRIPT")
 #Functions that are related to the VFs
 
 def compute_virtual_strain(grad_Na, virtual_displacement):
@@ -46,7 +49,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 		print('--------------------------------------------------------------------------------------------------------')
 	else:
 		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |	reaction	|  	 vfm 	  |  	ewk  	 |  	 iwk 	 ')
+		print('| epoch x/xxx |   lr    |    loss    |     eqb    |	reaction	|  	 vfm  |   ewk	|  	iwk ')
 		print('--------------------------------------------------------------------------------------------------------')
 
 
@@ -88,7 +91,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				F22.requires_grad = True
 
 				# Forward pass NN to obtain W_NN
-				W_NN = model(torch.cat((F11,F12,F21,F22),dim=1))
+				W_NN, params = model(torch.cat((F11,F12,F21,F22),dim=1))
 
 				# Get gradients of W w.r.t F
 				dW_NN_dF11 = torch.autograd.grad(W_NN,F11,torch.ones(F11.shape[0],1),create_graph=True)[0]
@@ -100,7 +103,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				P_NN = torch.cat((dW_NN_dF11,dW_NN_dF12,dW_NN_dF21,dW_NN_dF22),dim=1)
 
 				# Forward pass to obtain zero deformation energy correction
-				W_NN_0 = model(torch.cat((F11_0,F12_0,F21_0,F22_0),dim=1))
+				W_NN_0, _ = model(torch.cat((F11_0,F12_0,F21_0,F22_0),dim=1))
 
 				# Get gradients of W_NN_0 w.r.t F
 				dW_NN_dF11_0 = torch.autograd.grad(W_NN_0,F11_0,torch.ones(F11_0.shape[0],1),create_graph=True)[0]
@@ -123,7 +126,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				# Compute final stress (NN + correction)
 				P = P_NN + P_cor #P.shape:torch.Size([2752, 4]) 
 
-				energy_loss = torch.abs(torch.mean(P)) #test strong from of eq 
+				#energy_loss = torch.abs(torch.mean(P)) #test strong from of eq 
 
 				
 				#Define VFs. For this case is an in plane deformation with vx=0, vy=x^2.  
@@ -219,24 +222,24 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 
 
-				return  eqb_loss, reaction_loss, energy_loss, torch.sum(ewk),torch.sum(iwk) #vf_loss, torch.sum(ewk),torch.sum(iwk)
+				return  eqb_loss, reaction_loss, vf_loss, torch.sum(ewk),torch.sum(iwk), params
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets: #per loading step
-				eqb_loss, reaction_loss, vf_loss, ewk,iwk = computeLosses(data, model)
+				eqb_loss, reaction_loss, vf_loss, ewk,iwk , params= computeLosses(data, model)
 				#vf_loss, ewk,iwk = computeLosses(data, model)
 				#print(f'VF loss:{vf_loss}')
 				#print(f'eqb_loss loss:{eqb_loss}')
 				#print(f'reaction_loss loss:{reaction_loss}')
 
-				loss += vf_loss #eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss# (VF factor on uncertainty of automatically chosen VF)
+				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss# (VF factor on uncertainty of automatically chosen VF)
 
 			# back propagate
 			loss.backward()
 
-			return loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk
+			return loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk , params
 
-		loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk = optimizer.step(closure)
+		loss, eqb_loss, reaction_loss, vf_loss, ewk,iwk , params= optimizer.step(closure)
 		#loss,vf_loss, ewk,iwk = optimizer.step(closure)
 		scheduler.step()
 
@@ -255,4 +258,4 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 			loss_history.append([epoch_iter+1,loss.item()])
 
-	return model, loss_history
+	return model, loss_history, params

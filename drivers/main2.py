@@ -11,7 +11,7 @@ from config import *
 initCUDA(cuda)
 #supporting files
 from model2 import *
-from train import *
+from train_VFM import *
 #from train import *
 from helper import *
 from post_process_param import *
