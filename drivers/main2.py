@@ -40,10 +40,10 @@ logging.basicConfig(
         logging.StreamHandler()  # Prints to console as well
     ]
 )
-logging.info("Training each network on several models (NeoHookean, Isihara, Haynes Wilson).")
+logging.info("Training each network on several models....")
 
 
-logging.info("Starting experiment run in main.py.")
+logging.info("Starting experiment run in main2.py.")
 
 
 logging.info("Logging configuration settings from config.py:")
@@ -149,13 +149,17 @@ for ensemble_iter in range(ensemble_size):
     
     for fem_material in fem_materials: #Check that the model not always expects the same order. I think it does not matter because each is a new model. 
         print(f'\nTraining model {ensemble_iter+1} on {fem_material}.\n')
+        #logging.info("ABOUT TO EXECUTE")
         model, loss_history, params = train_weak_VFM(model, datasets, fem_material, noise_level)
         #print(params)
-        params_all_models[fem_material].append(params)
+        params_all_models[fem_material].append(params.squeeze().detach() )
         os.makedirs(output_dir+'/'+fem_material+'/',exist_ok=True)
         torch.save(model.state_dict(), output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')
         exportList(output_dir+'/'+fem_material+'/','loss_history_noise='+noise_level+'_ID='+str(ensemble_iter),loss_history)
     
+
+
+    #logging.info(f'PARAMS ALL {params_all_models[fem_material]}')
     model.apply(init_weights)
     if model.anisotropy_flag is not None:
         model.alpha = torch.nn.Parameter(torch.randn(1,1))
@@ -166,6 +170,7 @@ print("Final Estimated Parameters:")
 #evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
 for fem_material in fem_materials: #Check that the model not always expects the same order. I think it does not matter because each is a new model. 
     #print(f'\n Evaluating model on {fem_material}.\n')
+    #logging.info('\n\n--------------------------------------------------------------------------')
     logging.info(f"Evaluating mixture model on: {fem_material}.")
     evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir, params_all_models[fem_material])
 
@@ -179,7 +184,7 @@ for fem_material in fem_materials: #Check that the model not always expects the 
 
 
 print('Completed.')
-print('\n\n=========================================================================================================================')
-print('Best model:')
+#print('\n\n=========================================================================================================================')
+#print('Best model:')
 #print(model.state_dict())
-print('=========================================================================================================================\n\n')
+#print('=========================================================================================================================\n\n')

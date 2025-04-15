@@ -118,6 +118,23 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 
 		return W, P
 
+
+	def get_true_params(fem_material):
+		"""
+		Get true parameters of a material for loss selection
+		Input:		fem_material
+		Output:		true parameters described in publication
+		"""
+		if fem_material == 'NeoHookean':
+			real_params= torch.tensor([0.5, 0, 0, 0, 0, 1.5], dtype=torch.float32)
+ 
+		elif fem_material == 'Isihara':
+			real_params= torch.tensor([0.5, 1, 0, 0, 1, 1.5], dtype=torch.float32)
+		elif fem_material == 'HainesWilson':
+			real_params= torch.tensor([0.5, 1, 0.7 ,0.2 ,0, 1.5], dtype=torch.float32)
+
+		return real_params
+
 	def get_true_W(fem_material,J,C,I1,I2,I3):
 		"""
 
@@ -248,7 +265,7 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 			elif strain_path == 'BC':
 				P_idx = 0
 
-			print('Evaluating and plotting: '+fem_material+' for strain path '+strain_path)
+			#print('Evaluating and plotting: '+fem_material+' for strain path '+strain_path)
 
 			gamma=np.linspace(g_min,g_max,gamma_steps)
 			F, xlabel = getStrainPathDeformationGradient(strain_path, gamma_steps, gamma)
@@ -304,17 +321,62 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 				for ensemble_iter in range(ensemble_size):
 					final_losses[ensemble_iter] = pd.read_csv(output_dir+'/'+fem_material+'/loss_history_noise='+noise_level+'_ID='+str(ensemble_iter)+'.csv', header=None).values[-1][1]
 
+				#logging.info(f"final_losses: {final_losses}")
+
 				final_losses_ratio = final_losses / torch.min(final_losses)
 				num_models_remove = torch.where(final_losses_ratio >= accept_ratio)[0].shape[0]
 				num_models_keep = ensemble_size - num_models_remove
 
 				idx_best_models = torch.topk(-final_losses.flatten(),num_models_keep).indices
 				idx_worst_models = torch.topk(final_losses.flatten(),num_models_remove).indices
+
+
+				#Alt way of calculating best and worst
+				params_true=get_true_params(fem_material)
+				params_stack = torch.stack(params)  
+				#print("Stacked parameters:")
+				#print(params_stack)
+
+
+				l2_norms = torch.norm(params_stack - params_true, dim=1)
+				#logging.info(f"L2 norms for each model:{l2_norms}")
+				#logging.info(l2_norms)
+
+				# Now, using torch.topk to get the indices of the best and worst models:
+				#num_best = 1   # e.g., select the single best model (lowest L2 norm)
+				#num_worst = 1  # e.g., select the single worst model (highest L2 norm)
+
+				# For best models (lowest L2 norm), set largest=False
+				best_norms, best_indices = torch.topk(l2_norms, k=num_models_keep, largest=False)
+
+
+				# For worst models (highest L2 norm), set largest=True
+				worst_norms, worst_indices = torch.topk(l2_norms, k=num_models_remove, largest=True)
+
+
+
+
 			if bprint:
 				#print(f'The best model predicted: {params[idx_best_models[0]]}')
 				#print(f'The worst model predicted: {params[idx_worst_models[0]]}')
+				logging.info(f"Indices of best models predicted: {idx_best_models}")
+				logging.info(f"Indices of worst models predicted: {idx_worst_models}")
+
 				logging.info(f"The best model predicted: {params[idx_best_models[0]]}")
-				logging.info(f"The worst model predicted: {params[idx_worst_models[0]]}")		
+				logging.info(f"The worst model predicted: {params[idx_worst_models[0]]}")
+
+				logging.info(f"-------------------------------")
+				logging.info(f"ALT MODEL CALCULATION")
+
+				logging.info(f"Best model L2 norm(s): {best_norms}")
+				logging.info(f"Worst model L2 norm(s): {worst_norms}")
+
+				logging.info(f"Indices of best model(s) by L2: {best_indices}")
+				logging.info(f"Indices of worst model(s) by L2: {worst_indices}")
+
+				logging.info(f"The best model predicted by L2: {params[best_indices[0]]}")				
+				logging.info(f"The worst model predicted by L2: {params[worst_indices[0]]}")
+
 				bprint=0
 
 			W_predictions = torch.zeros((gamma_steps,ensemble_size))

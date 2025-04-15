@@ -1,5 +1,6 @@
 from core import *
 from config import *
+import logging
 
 
 def train_weak(model, datasets, fem_material, noise_level):
@@ -25,17 +26,17 @@ def train_weak(model, datasets, fem_material, noise_level):
 	elif lr_schedule == 'cyclic':
 		scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=base_lr, max_lr=max_lr, cycle_momentum=cycle_momentum, step_size_up=step_size_up, step_size_down=step_size_down)
 	else:
-		print('Incorrect scheduler. Choose between `multistep` and `cyclic`.')
+		logging.info('Incorrect scheduler. Choose between `multistep` and `cyclic`.')
 
 
 	if model.anisotropy_flag is not None:
-		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |    angle   |')
-		print('--------------------------------------------------------------------------------------------------------')
+		logging.info('--------------------------------------------------------------------------------------------------------')
+		logging.info('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |    angle   |')
+		logging.info('--------------------------------------------------------------------------------------------------------')
 	else:
-		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |')
-		print('--------------------------------------------------------------------------------------------------------')
+		logging.info('--------------------------------------------------------------------------------------------------------')
+		logging.info('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |')
+		logging.info('--------------------------------------------------------------------------------------------------------')
 
 
 	for epoch_iter in range(epochs):
@@ -76,7 +77,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				F22.requires_grad = True
 
 				# Forward pass NN to obtain W_NN
-				#print("Estimation of W_NN")
+				#logging.info("Estimation of W_NN")
 				W_NN, params = model(torch.cat((F11,F12,F21,F22),dim=1)) #shape of torch.Size([2752, 1])
 
 				# Get gradients of W w.r.t F
@@ -89,7 +90,7 @@ def train_weak(model, datasets, fem_material, noise_level):
 				P_NN = torch.cat((dW_NN_dF11,dW_NN_dF12,dW_NN_dF21,dW_NN_dF22),dim=1)
 
 				# Forward pass to obtain zero deformation energy correction
-				#print("Estimation of W_NN_0")
+				#logging.info("Estimation of W_NN_0")
 				W_NN_0, _ = model(torch.cat((F11_0,F12_0,F21_0,F22_0),dim=1)) #shape of torch.Size([1, 1])
 
 				# Get gradients of W_NN_0 w.r.t F
@@ -148,19 +149,19 @@ def train_weak(model, datasets, fem_material, noise_level):
 		loss, eqb_loss, reaction_loss, params = optimizer.step(closure)
 		scheduler.step()
 		#if epoch_iter==25:
-		#	print(params)
+		#	logging.info(params)
 
 
 		if(epoch_iter % verbose_frequency == 0):
 			if model.anisotropy_flag is not None:
 				if model.anisotropy_flag == 'double':
-					print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
+					logging.info('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
 						epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(),torch.sigmoid(model.alpha)*90))
 				elif model.anisotropy_flag == 'single':
-					print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
+					logging.info('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
 						epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(),torch.sigmoid(model.alpha)*180))
 			else:
-				print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E' % (
+				logging.info('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E' % (
 					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item()))
 
 			
@@ -180,7 +181,7 @@ def compute_virtual_strain(grad_Na, virtual_displacement):
 
 
 def train_weak_VFM(model, datasets, fem_material, noise_level):
-
+	logging.info("Using VFM regularization")
 	#loss history
 	loss_history = []
 
@@ -202,17 +203,18 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 	elif lr_schedule == 'cyclic':
 		scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, base_lr=base_lr, max_lr=max_lr, cycle_momentum=cycle_momentum, step_size_up=step_size_up, step_size_down=step_size_down)
 	else:
-		print('Incorrect scheduler. Choose between `multistep` and `cyclic`.')
+		logging.info('Incorrect scheduler. Choose between `multistep` and `cyclic`.')
 
 
 	if model.anisotropy_flag is not None:
-		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |    angle   |')
-		print('--------------------------------------------------------------------------------------------------------')
+		logging.info('--------------------------------------------------------------------------------------------------------')
+		logging.info('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |    angle   |')
+		logging.info('--------------------------------------------------------------------------------------------------------')
 	else:
-		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |	reaction	|  	 vfm  |   ewk	|  	iwk ')
-		print('--------------------------------------------------------------------------------------------------------')
+		
+		logging.info('--------------------------------------------------------------------------------------------------------')
+		logging.info('| epoch x/xxx |   lr   |    loss    |     eqb     |   reaction  |    vfm    |     ewk     |     iwk    |')
+		logging.info('--------------------------------------------------------------------------------------------------------')
 
 
 	for epoch_iter in range(epochs):
@@ -323,8 +325,8 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 
 					# # Mapping from **nodes to elements**
 					element_evf = gradient_virtual_displacement[data.connectivity[a]]  
-					#print(P.shape)
-					#print(element_evf.shape)
+					#logging.info(P.shape)
+					#logging.info(element_evf.shape)
 					external_virtual_work=(P * element_evf).sum(dim=1)* data.qpWeights
 					#(external_virtual_work.shape)
 					ewk.index_add_(0,data.connectivity[a],external_virtual_work)
@@ -338,7 +340,7 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 							#external_virtual_work=P[:,voigt_map[i][j]] *element_evf[:,j]* data.qpWeights # Shape [2752]. I think qpweights is area, and because it is a planar surface it is also volume
 							
 							#force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights #torch.Size([2752])
-							#print(P[:,voigt_map[i][j]].shape)
+							#logging.info(P[:,voigt_map[i][j]].shape)
 							force = P[:,voigt_map[i][j]] * element_evf [:,voigt_map[i][j]]* data.qpWeights #torch.Size([2752])
 							
 
@@ -359,8 +361,8 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 							# # Mapping from **elements to nodes**
 							#iwk[:,i].index_add_(0,data.connectivity[a],internal_virtual_work)
 							iwk.index_add_(0,data.connectivity[a],internal_virtual_work)	
-							#print(iwk.shape)
-							#print(reaction.dofs.shape)
+							#logging.info(iwk.shape)
+							#logging.info(reaction.dofs.shape)
 	
 							iwk[~reaction.dofs[:,1]]=0
 
@@ -378,8 +380,8 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 				for reaction in data.reactions:
 					reaction_loss += (torch.sum(f_int_nodes[reaction.dofs]) - reaction.force)**2
 
-				#print(f'EVW:{torch.sum(ewk)}')
-				#print(f'IVW:{torch.sum(iwk)}')
+				#logging.info(f'EVW:{torch.sum(ewk)}')
+				#logging.info(f'IVW:{torch.sum(iwk)}')
 				vf_loss=torch.sum(ewk-iwk)**2
 
 
@@ -390,9 +392,9 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 			for data in datasets: #per loading step
 				eqb_loss, reaction_loss, vf_loss, ewk,iwk , params= computeLosses(data, model)
 				#vf_loss, ewk,iwk = computeLosses(data, model)
-				#print(f'VF loss:{vf_loss}')
-				#print(f'eqb_loss loss:{eqb_loss}')
-				#print(f'reaction_loss loss:{reaction_loss}')
+				#logging.info(f'VF loss:{vf_loss}')
+				#logging.info(f'eqb_loss loss:{eqb_loss}')
+				#logging.info(f'reaction_loss loss:{reaction_loss}')
 
 				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss + vf_loss# (VF factor on uncertainty of automatically chosen VF)
 
@@ -409,13 +411,13 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 		if(epoch_iter % verbose_frequency == 0):
 			if model.anisotropy_flag is not None:
 				if model.anisotropy_flag == 'double':
-					print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
+					logging.info('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
 						epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(),torch.sigmoid(model.alpha)*90))
 				elif model.anisotropy_flag == 'single':
-					print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
+					logging.info('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
 						epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(),torch.sigmoid(model.alpha)*180))
 			else:
-				print('| epoch %d/%d | %.1E | %.4E | %.4E  | %.4E | %.4E | %.4E | %.4E  ' % (
+				logging.info('| epoch %d/%d | %.1E | %.4E | %.4E  | %.4E | %.4E | %.4E | %.4E  ' % (
 					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(), vf_loss.item(), ewk.item(), iwk.item()))
 
 			loss_history.append([epoch_iter+1,loss.item()])
