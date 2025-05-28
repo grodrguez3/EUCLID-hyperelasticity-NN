@@ -16,7 +16,7 @@ matplotlib.pyplot.rcParams['font.family'] = 'serif'
 matplotlib.pyplot.rcParams['mathtext.fontset'] = 'dejavuserif'
 
 
-def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir, params):
+def evaluate_icnn_param(model, fem_material, noise_level, plot_quantities, output_dir, params):
 
 	"""
 	Picks the best model and the parameters associated with it. 
@@ -333,22 +333,24 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 
 				#Alt way of calculating best and worst
 				params_true=get_true_params(fem_material)
-				params_stack = torch.stack(params)  
+				params_stack = torch.stack(params).squeeze(1)#.detach().cpu()  
 				#print("Stacked parameters:")
-				#print(params_stack)
+				#print(params_stack.shape)
+				#print(params_true.shape)
 
 
 				l2_norms = torch.norm(params_stack - params_true, dim=1)
+				
 				#logging.info(f"L2 norms for each model:{l2_norms}")
 				#logging.info(l2_norms)
-
+				#print(l2_norms)
 				# Now, using torch.topk to get the indices of the best and worst models:
 				#num_best = 1   # e.g., select the single best model (lowest L2 norm)
 				#num_worst = 1  # e.g., select the single worst model (highest L2 norm)
 
 				# For best models (lowest L2 norm), set largest=False
 				best_norms, best_indices = torch.topk(l2_norms, k=num_models_keep, largest=False)
-
+				
 
 				# For worst models (highest L2 norm), set largest=True
 				worst_norms, worst_indices = torch.topk(l2_norms, k=num_models_remove, largest=True)
@@ -374,8 +376,10 @@ def evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir,
 				logging.info(f"Indices of best model(s) by L2: {best_indices}")
 				logging.info(f"Indices of worst model(s) by L2: {worst_indices}")
 
-				logging.info(f"The best model predicted by L2: {params[best_indices[0]]}")				
-				logging.info(f"The worst model predicted by L2: {params[worst_indices[0]]}")
+				logging.info(f"True Parameters: {params_true}")
+				logging.info(f"Parameters from best model predicted by L2: {params[best_indices[0]]}")				
+				logging.info(f"Parameters from worst model predicted by L2: {params[worst_indices[0]]}")
+				
 
 				bprint=0
 

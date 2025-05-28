@@ -10,11 +10,11 @@ from config import *
 #CUDA
 initCUDA(cuda)
 #supporting files
-from model2 import *
+from model import *
 from train import *
 #from train import *
 from helper import *
-from post_process_param import *
+from post_process_param import evaluate_icnn_param
 #from post_process_compare ismport*
 
 import os
@@ -114,7 +114,7 @@ elif 'Anisotropy' in fem_material:
                  dropout_rate=dropout_rate,
                  anisotropy_flag='single')
 else:
-    model = ICNN3(n_input=n_input,
+    model = ICNN(n_input=n_input,
                  n_hidden=n_hidden,
                  n_output=n_output,
                  use_dropout=use_dropout,
@@ -142,7 +142,7 @@ for ensemble_iter in range(ensemble_size):
     #print('\nTraining model '+str(ensemble_iter+1)+' out of '+str(ensemble_size)+'.\n')
     logging.info(f"Training model {ensemble_iter+1} out of {ensemble_size}.")
 
-    model, loss_history, params = train_weak(model, datasets, fem_material, noise_level)
+    model, loss_history, params = train_weak_VFM_correct(model, datasets, fem_material, noise_level)
     params_all_models.append(params)
     os.makedirs(output_dir+'/'+fem_material+'/',exist_ok=True)
     torch.save(model.state_dict(), output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')
@@ -168,7 +168,9 @@ logging.info("==================================================================
 #print(params_all_models)
 #print('Evaluating and plotting ICNN on standard strain paths.')
 #evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir)
-evaluate_icnn(model, fem_material, noise_level, plot_quantities, output_dir, params_all_models)
+#print(model)  
+#Next line receives model to inherit the architecture but then they load the state dicts from different models to get the best ones. 
+evaluate_icnn_param(model, fem_material, noise_level, plot_quantities, output_dir, params_all_models)
 logging.info("Completed experiment run.")
 
 #evaluate_icnn_against_another(model, fem_material, noise_level, plot_quantities, output_dir, compare_against='Holzapfel')

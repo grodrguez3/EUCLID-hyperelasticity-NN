@@ -5,6 +5,7 @@ from core import *
 #config
 import config as c
 
+#Modified script with convolutional network to process several nodes at a time
 
 class convexLinear(torch.nn.Module):
 	"""
@@ -29,7 +30,7 @@ class convexLinear(torch.nn.Module):
 		w_times_x= torch.mm(x, torch.nn.functional.softplus(self.weights.t()))
 		return w_times_x
 
-class ICNN(torch.nn.Module):
+class ICNN3(torch.nn.Module):
 	"""
 
 	Material model based on Input convex neural network.
@@ -47,9 +48,13 @@ class ICNN(torch.nn.Module):
 	Output: 			NN-based strain energy density (W_NN)
 
 	"""
-	def __init__(self, n_input, n_hidden, n_output, use_dropout, dropout_rate, anisotropy_flag=None, fiber_type=None):
-		super(ICNN, self).__init__()
+	_printed_message = False
 
+	def __init__(self, n_input, n_hidden, n_output, use_dropout, dropout_rate, anisotropy_flag=None, fiber_type=None):
+		super(ICNN3, self).__init__()
+		if not ICNN3._printed_message:
+			print("Here model 2")
+			ICNN3._printed_message=True
 		# Create Module dicts for the hidden and skip-connection layers
 		self.layers = torch.nn.ModuleDict()
 		self.skip_layers = torch.nn.ModuleDict()
@@ -87,7 +92,7 @@ class ICNN(torch.nn.Module):
 		F22 = x[:,3:4]
 
 		# Compute right Cauchy green strain Tensor
-		C11 = F11**2. + F21**2. 
+		C11 = F11**2. + F21**2.
 		C12 = F11*F12 + F21*F22
 		C21 = F11*F12 + F21*F22
 		C22 = F12**2. + F22**2.
@@ -96,32 +101,15 @@ class ICNN(torch.nn.Module):
 		I1 = C11 + C22 + 1.0
 		I2 = C11 + C22 - C12*C21 + C11*C22
 		I3 = C11*C22 - C12*C21
-		if self.anisotropy_flag is not None:
-			Ia = torch.cos(alpha)*(C11*torch.cos(alpha)+C12*torch.sin(alpha)) + torch.sin(alpha)*(C21*torch.cos(alpha)+C22*torch.sin(alpha))
-
-		if self.anisotropy_flag == 'double':
-			if self.fiber_type == 'mirror':
-				beta = -alpha
-			elif self.fiber_type == 'general':
-				beta = alpha + pi/2.
-			Ib = torch.cos(beta)*(C11*torch.cos(beta)+C12*torch.sin(beta)) + torch.sin(beta)*(C21*torch.cos(beta)+C22*torch.sin(beta))
 
 		# Apply transformation to invariants
-		K1 = I1 * torch.pow(I3,-1./3.) - 3.0
+		K1 = I1 * torch.pow(I3,-1./3.) - 3.0 
 		K2 = (I1 + I3 - 1.) * torch.pow(I3,-2./3.) - 3.0
 		J = torch.sqrt(I3)
 		K3 = (J-1.)**2
 
 		if self.anisotropy_flag is not None:
-			if self.anisotropy_flag == 'single':
-				K4 = (Ia * J**(-2./3.) - 1.0)**2
-				x_input = torch.cat((K1,K2,K3,K4),dim=1).float()
-
-			elif self.anisotropy_flag == 'double':
-				K4 = (Ia * J**(-2./3.) - 1.0)**2
-				K5 = (Ib * J**(-2./3.) - 1.0)**2
-				# Concatenate feature
-				x_input = torch.cat((K1,K2,K3,K4,K5),dim=1).float()
+			pass 
 		else:
 			# Concatenate feature
 			x_input = torch.cat((K1,K2,K3),dim=1).float()
@@ -139,7 +127,9 @@ class ICNN(torch.nn.Module):
 			if self.training:
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
+
 		y = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
+
 		return y
 
 def init_weights(m):

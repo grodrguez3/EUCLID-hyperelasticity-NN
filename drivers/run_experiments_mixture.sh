@@ -1,6 +1,6 @@
 #!/bin/bash
 # Define an array for all material models
-material_models=("NeoHookean" "Isihara" "HainesWilson")
+material_models=("NeoHookean" "HainesWilson")
 # Define an array for noise levels
 noise_levels=("high")
 

@@ -32,10 +32,10 @@ eqb_loss_factor:                Factor to scale the force residuals at the free 
 reaction_loss_factor:           Factor to scale the force residuals at the fixed DoFs.
 verbose_frequency:              Prints the training progress every nth epoch.
 """
-ensemble_size = 10 #paper is 30
+ensemble_size = 3 #paper is 30
 random_init = True
 n_input = 3
-n_output = 6
+n_output = 1
 n_hidden = [64,64,64]
 #n_hidden = [128,128,128]
 #n_hidden = [64, 128, 256, 256, 128, 64]
@@ -45,7 +45,7 @@ dropout_rate = 0.2
 use_sftpSquared = True
 scaling_sftpSq = 1./12
 opt_method = 'adam'
-epochs = 5 #Paper is 500
+epochs = 3 #Paper is 500
 lr_schedule = 'cyclic'
 if lr_schedule == 'multistep':
     lr = 0.1
