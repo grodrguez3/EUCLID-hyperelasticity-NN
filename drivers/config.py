@@ -6,7 +6,7 @@ num_nodes_per_element = 3
 voigt_map = [[0,1],[2,3]]
 
 fem_dir = '../fem-data/'
-output_dir = '../mixture_model_deep_VFM/'
+output_dir = '../VFM_compare/VFM/'
 
 # Dataset settings
 normalization_flag = False
@@ -32,7 +32,7 @@ eqb_loss_factor:                Factor to scale the force residuals at the free 
 reaction_loss_factor:           Factor to scale the force residuals at the fixed DoFs.
 verbose_frequency:              Prints the training progress every nth epoch.
 """
-ensemble_size = 3 #paper is 30
+ensemble_size = 15 #paper is 30
 random_init = True
 n_input = 3
 n_output = 1
@@ -45,7 +45,7 @@ dropout_rate = 0.2
 use_sftpSquared = True
 scaling_sftpSq = 1./12
 opt_method = 'adam'
-epochs = 3 #Paper is 500
+epochs = 150 #Paper is 500
 lr_schedule = 'cyclic'
 if lr_schedule == 'multistep':
     lr = 0.1

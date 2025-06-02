@@ -120,8 +120,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 				for a in range(num_nodes_per_element):
 					for i in range(dim):
 						for j in range(dim):
-							force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights
-							f_int_nodes[:,i].index_add_(0,data.connectivity[a],force)
+							force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights #element
+							f_int_nodes[:,i].index_add_(0,data.connectivity[a],force) #node
 
 				# clone f_int_nodes
 				f_int_nodes_clone = f_int_nodes.clone()
@@ -299,17 +299,23 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 				#v_y_star = data.x_nodes[:,1]*2
 
 				#Correct VF. Has the shape of nodes. 
-				v_x_star = torch.zeros_like(data.x_nodes[:,1]) #data.x_nodes[:,1]
-				v_y_star = data.x_nodes[:,1]*2 #torch.sin(np.pi * data.x_nodes[:,1]*0.5) 
+				v_x_star1 = torch.zeros_like(data.x_nodes[:,1]) 
+				v_y_star1 = data.y_nodes[:,1]*2 #corrected
 
-				virtual_displacement = torch.stack([v_x_star, v_y_star], dim=1)  #torch.Size([1441, 2])
+				v_x_star2 = data.x_nodes[:,1]/2 
+				v_y_star2 = torch.zeros_like(data.x_nodes[:,1]) 
+
+
+				virtual_displacement1 = torch.stack([v_x_star1, v_y_star1], dim=1)  #torch.Size([1441, 2])
+				virtual_displacement2 = torch.stack([v_x_star2, v_y_star2], dim=1)  #torch.Size([1441, 2])
 
 				#Calculate gradient of virtual displacement
 				#gradient_virtual_displacement = torch.stack([v_x_star, torch.cos(np.pi * data.x_nodes[:,1]*0.5)*np.pi*0.5 ], dim=1)  #torch.Size([1441, 2])
 				
 				#Correct VF
-				gradient_virtual_displacement = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])
-				
+				gradient_virtual_displacement1 = torch.stack([v_x_star1,v_x_star1, torch.ones_like(v_y_star1)*2 , v_x_star1 ], dim=1)  #torch.Size([1441, 4])
+				gradient_virtual_displacement2 = torch.stack([torch.ones_like(v_y_star1)/2,v_x_star1, v_x_star1 , v_x_star1 ], dim=1)  #torch.Size([1441, 4])
+
 				#Incorrect VF
 				#gradient_virtual_displacement = torch.stack([torch.zeros_like(v_y_star),data.x_nodes[:,1], 2*torch.ones_like(v_y_star) , data.x_nodes[:,1] ], dim=1)  #torch.Size([1441, 4])
 
@@ -325,15 +331,16 @@ def train_weak_VFM(model, datasets, fem_material, noise_level):
 				for a in range(num_nodes_per_element): #this is 3
 
 					# # Mapping from **nodes to elements**
-					element_ivf = gradient_virtual_displacement[data.connectivity[a]]  
-					#enternal_virtual_work=(P * element_evf).sum(dim=1)* data.qpWeights
+					element_ivf1 = gradient_virtual_displacement1[data.connectivity[a]]  
+					element_ivf2 = gradient_virtual_displacement2[data.connectivity[a]] 
+
 					F=torch.cat((F11,F12,F21,F22),dim=1)
 					J = computeJacobian(F)
-					correct_internal_virtual_work= ((1/J*P*F)* element_ivf).sum(dim=1)* data.qpWeights
+					correct_internal_virtual_work= ((1/J*P*F)* (element_ivf1+element_ivf2)).sum(dim=1)* data.qpWeights
 
 
 					#(external_virtual_work.shape)
-					iwk.index_add_(0,data.connectivity[a],correct_internal_virtual_work)
+					iwk.index_add_(0,data.connectivity[a],correct_internal_virtual_work) 
 
 					for i in range(dim): # dim is 2 	
 						for j in range(dim): #dim is 2
@@ -463,9 +470,9 @@ def train_weak_VFM_correct(model, datasets, fem_material, noise_level):
 		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |    angle   |')
 		print('--------------------------------------------------------------------------------------------------------')
 	else:
-		print('--------------------------------------------------------------------------------------------------------')
-		print('| epoch x/xxx |   lr    |    loss    |     eqb    |  reaction  |')
-		print('--------------------------------------------------------------------------------------------------------')
+		logging.info('--------------------------------------------------------------------------------------------------------')
+		logging.info('| epoch x/xxx |   lr   |    loss    |     eqb     |   reaction  |    vfm    |     ewk     |     iwk    |')
+		logging.info('--------------------------------------------------------------------------------------------------------')
 
 
 	for epoch_iter in range(epochs):
@@ -550,68 +557,98 @@ def train_weak_VFM_correct(model, datasets, fem_material, noise_level):
 				#v_x_star = data.x_nodes[:,1]**2 #data.x_nodes[:,1]
 				#v_y_star = data.x_nodes[:,1]*2
 
-				#Correct VF. Has the shape of nodes.  
-				v_x_star = torch.zeros_like(data.u_nodes[:,1]) #data.x_nodes[:,1]
-				v_y_star = data.u_nodes[:,1]*2 #not x, u is displacement x_nodes is node position not displacement
+				#Correct VF. Has the shape of nodes. 
+				virtual_displacement = {
+					'x': [[] for _ in range(2)],   # creates [[], []]
+					'y': [[] for _ in range(2)]}   # creates [[], []]
 
-				virtual_displacement = torch.stack([v_x_star, v_y_star], dim=1)  #torch.Size([1441, 2])
 
-				#Correct VF
-				gradient_virtual_displacement = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])
-				gradient_virtual_displacement_t = torch.stack([v_x_star,v_x_star, torch.ones_like(v_y_star)*2 , v_x_star ], dim=1)  #torch.Size([1441, 4])	
+				v_x_star1 = torch.zeros_like(data.x_nodes[:,1]) 
+				v_y_star1 = data.u_nodes[:,1]*2 #corrected
+
+				v_x_star2 = data.u_nodes[:,1]/2 
+				v_y_star2 = torch.zeros_like(data.x_nodes[:,1]) 
+
+
+				virtual_displacement1 = torch.stack([v_x_star1, v_y_star1], dim=1)  #torch.Size([1441, 2])
+				virtual_displacement2 = torch.stack([v_x_star2, v_y_star2], dim=1)  #torch.Size([1441, 2])
+
+				#Calculate gradient of virtual displacement
+				#gradient_virtual_displacement = torch.stack([v_x_star, torch.cos(np.pi * data.x_nodes[:,1]*0.5)*np.pi*0.5 ], dim=1)  #torch.Size([1441, 2])
 				
-				#In this case the gradients are the same
-				virtual_strain=0.5*(gradient_virtual_displacement+gradient_virtual_displacement_t) #this is per node
-				#element_virtual_strain = virtual_strain[data.connectivity[a]]  # this is per element
+				#Correct VF
+				gradient_virtual_displacement1 = torch.stack([v_x_star1,v_x_star1, torch.ones_like(v_y_star1)*2 , v_x_star1 ], dim=1)  #torch.Size([1441, 4])
+				gradient_virtual_displacement2 = torch.stack([torch.ones_like(v_y_star1)/2,v_x_star1, v_x_star1 , v_x_star1 ], dim=1)  #torch.Size([1441, 4])
 
 				#Incorrect VF
 				#gradient_virtual_displacement = torch.stack([torch.zeros_like(v_y_star),data.x_nodes[:,1], 2*torch.ones_like(v_y_star) , data.x_nodes[:,1] ], dim=1)  #torch.Size([1441, 4])
 				ewk=torch.zeros(data.numNodes)
 				iwk=torch.zeros(data.numNodes)
 
-				#Compute internal work in elements:
-				for a in range(num_nodes_per_element):
+				#Compute internal work
+				for a in range(num_nodes_per_element): #this is 3
 
-					element_virtual_strain = virtual_strain[data.connectivity[a]]
-					
-					correct_internal_virtual_work= ((1/J*P*F)* element_virtual_strain).sum(dim=1)* data.qpWeights				
-					#print(f'IVK shape (should be elementwise):{correct_internal_virtual_work.shape}')
-					#print(f'connectivity for a :{data.connectivity[a][0]}')
-					iwk.index_add_(0,data.connectivity[a],correct_internal_virtual_work)
+					# # Mapping from **nodes to elements**
+					element_ivf1 = gradient_virtual_displacement1[data.connectivity[a]]  
+					element_ivf2 = gradient_virtual_displacement2[data.connectivity[a]] 
 
+					#F=torch.cat((F11,F12,F21,F22),dim=1)
+					#F_t=torch.cat((F11,F21,F12,F22),dim=1)
+					F_mat = torch.stack([
+						torch.stack([F11, F12], dim=-1),
+						torch.stack([F21, F22], dim=-1)
+					], dim=-2).squeeze() #torch.Size([2752, 2, 2]) after squeeze                  # [nElem,2,2]
 
+					P_mat = torch.stack([
+						torch.stack([P[:,0:1], P[:,1:2]], dim=-1),
+						torch.stack([P[:,2:3], P[:,3:4]], dim=-1)
+					], dim=-2).squeeze()                   # [nElem,2,2]
+					#print(P_mat.shape)	
+					# --- form Cauchy stress: σ = (1/J) P · Fᵀ ---
+					J = torch.det(F_mat)         # [nElem]
 
-				#Compute global reaction forces:
+					sigma = (P_mat @ F_mat.transpose(-2,-1)) / J.view(-1,1,1) # [nElem,2,2]
+												
+					# --- flatten σᵢⱼ in the standard row‐major order [11,12,21,22] ---
+					sigma_flat = sigma.view(-1,4)   # [nElem,4]	
+					#print(sigma_flat.shape)				
+					correct_internal_virtual_work= (sigma_flat* (element_ivf1+element_ivf2)).sum(dim=1)* data.qpWeights
+
+					iwk.index_add_(0,data.connectivity[a],correct_internal_virtual_work) #Nodes 
+
 
 				#Compute external work in elements:
+				c=-1
 				for reaction in data.reactions:
+					
 					#Reaction.dofs is 1441,2 and has True, False values. 
+					# if *any* component of this reaction is negative, skip it entirely
+					if (reaction.force < 0): #ok
+						#print(reaction.force)
+						continue
+					else:
+						c+=1
+						for a in range(num_nodes_per_element):
+							#print(f'React dofs shape: {[reaction.dofs.shape]}') #1441, 2
+							if c==0:
+								#print('VF 1') #assume x force goes first
+								
+								element_virtual_displacement = virtual_displacement2[data.connectivity[a]]
 
-					for a in range(num_nodes_per_element):
-						print(f'React dofs shape: {[reaction.dofs.shape]}') #1441, 2
-						element_virtual_displacement = virtual_displacement[data.connectivity[a]]
-						element_reaction_dofs = reaction.dofs[data.connectivity[a]]
+							else:
+								#print('VF 2') #assume y force goes after
+								element_virtual_displacement = virtual_displacement1[data.connectivity[a]]
 
-						#print(f'virtual_displacement shape:{virtual_displacement.shape}') #torch.Size([1441, 2])
-						#print(f'virtual_displacement shape:{element_virtual_displacement.shape}') #2752,2
-						#print(f'virtual_displacement shape in RD:{element_virtual_displacement[element_reaction_dofs].shape}') #55
-						#print(f'element_virtual_displacement in dofs:{element_virtual_displacement[element_reaction_dofs]}') #55
-		
-						node_virtual_work = virtual_displacement[reaction.dofs]*reaction.force
-						
-						element_virtual_work=node_virtual_work[data.connectivity[a]]* data.qpWeights
+							
+							element_reaction_dofs = reaction.dofs[data.connectivity[a]].int()  #in 0 and 1
 
-						print(f'reaction.dofs :{reaction.dofs[1:10,0]}') #
-						print(f'virtual_displacement.shape :{virtual_displacement.shape}') 
-						print(f'element_virtual_displacement_x0 shape:{element_virtual_displacement_x0.shape}') #torch.Size([1441, 2])
-						
-						element_virtual_displacement_x=element_virtual_displacement_x0[data.connectivity[a]]* data.qpWeights
-						element_virtual_displacement_y0 = virtual_displacement[reaction.dofs[:,1]]*reaction.force 	
-						element_virtual_displacement_y = element_virtual_displacement_y0[data.connectivity[a]]* data.qpWeights
-
-				
-					#print(f'element_virtual_displacement shape (should be elementwise):{element_virtual_displacement.shape}')
-					#correct_external_virtual_work = element_virtual_displacement * data.qpWeights 	
+							#print(f'Reaction dofs{element_reaction_dofs}')
+			
+							node_external_virtual_work = torch.sum(element_virtual_displacement*element_reaction_dofs, dim=1)*reaction.force #Ask
+							
+							element_virtual_work=node_external_virtual_work[data.connectivity[a]]* data.qpWeights
+							
+							ewk.index_add_(0,data.connectivity[a],element_virtual_work) #Nodes 
 
 
 				# compute internal forces on nodes
@@ -620,10 +657,10 @@ def train_weak_VFM_correct(model, datasets, fem_material, noise_level):
 					for i in range(dim):
 						for j in range(dim):
 							force = P[:,voigt_map[i][j]] * data.gradNa[a][:,j] * data.qpWeights #per element
-							print(f'force shape{force.shape}')
+							#print(f'force shape{force.shape}')
 							#print(f'force shape{force}')
 							f_int_nodes[:,i].index_add_(0,data.connectivity[a],force) #per node
-							print(f'f_int_nodes{f_int_nodes[:,i]}')
+							#print(f'f_int_nodes{f_int_nodes[:,i]}')
 
 				# clone f_int_nodes
 				f_int_nodes_clone = f_int_nodes.clone()
@@ -636,21 +673,32 @@ def train_weak_VFM_correct(model, datasets, fem_material, noise_level):
 				for reaction in data.reactions:
 					#Reaction.dofs is 1441,2 and has True, False values. 
 					reaction_loss += (torch.sum(f_int_nodes[reaction.dofs]) - reaction.force)**2
-					print(f'reaction.force{reaction.force}')
+					#print(f'reaction.force{reaction.force}')
+				
+				#logging.info(f'EVW:{torch.sum(ewk)}')
+				#logging.info(f'IVW:{torch.sum(iwk)}')
+				vf_loss=torch.sum(ewk-iwk)**2
 
-				return eqb_loss, reaction_loss
+
+
+				return  eqb_loss, reaction_loss, vf_loss, torch.sum(ewk),torch.sum(iwk)
+
+
+
+
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets:
-				eqb_loss, reaction_loss = computeLosses(data, model)
-				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss
+				eqb_loss, reaction_loss, vf_loss, ewk,iwk = computeLosses(data, model)
+				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss +vf_loss
 
 			# back propagate
 			loss.backward()
 
-			return loss, eqb_loss, reaction_loss
+			return loss, eqb_loss, reaction_loss, vf_loss, ewk, iwk
 
-		loss, eqb_loss, reaction_loss = optimizer.step(closure)
+		loss, eqb_loss, reaction_loss, vf_loss, ewk, iwk = optimizer.step(closure)
+
 		scheduler.step()
 
 
@@ -663,8 +711,8 @@ def train_weak_VFM_correct(model, datasets, fem_material, noise_level):
 					print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E | %5.6f' % (
 						epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(),torch.sigmoid(model.alpha)*180))
 			else:
-				print('| epoch %d/%d | %.1E | %.4E | %.4E | %.4E' % (
-					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item()))
+				logging.info('| epoch %d/%d | %.1E | %.4E | %.4E  | %.4E | %.4E | %.4E | %.4E  ' % (
+					epoch_iter+1, epochs, optimizer.param_groups[0]['lr'], loss.item(), eqb_loss.item(), reaction_loss.item(), vf_loss.item(), ewk.item(), iwk.item()))
 
 			loss_history.append([epoch_iter+1,loss.item()])
 
