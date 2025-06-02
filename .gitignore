@@ -3,6 +3,7 @@ core/__pycache__/
 /results_VFM/
 /results_orig/
 /results*/
+/VFM_compare/
 *.pyc
 *.png
 *.pdf
