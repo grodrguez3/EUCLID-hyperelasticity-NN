@@ -4,7 +4,11 @@ cuda = 0
 dim = 2
 num_nodes_per_element = 3
 voigt_map = [[0,1],[2,3]]
-
+voigt_map3d = [
+    [0, 5, 4],  # σ_xx, σ_xy, σ_xz
+    [5, 1, 3],  # σ_yx, σ_yy, σ_yz
+    [4, 3, 2]   # σ_zx, σ_zy, σ_zz
+]
 fem_dir = '../fem-data/'
 output_dir = '../VFM_compare/VFM/'
 
