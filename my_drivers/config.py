@@ -6,7 +6,7 @@ num_nodes_per_element = 3
 voigt_map = [[0,1],[2,3]]
 
 fem_dir = '../fem-data/'
-output_dir = '../VFM_compare/VFM/'
+output_dir = '../VFM_compare/normal/'
 
 # Dataset settings
 normalization_flag = False
