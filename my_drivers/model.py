@@ -53,6 +53,7 @@ class ICNN(torch.nn.Module):
 		# Create Module dicts for the hidden and skip-connection layers
 		self.layers = torch.nn.ModuleDict()
 		self.skip_layers = torch.nn.ModuleDict()
+		self.global_pooling= torch.nn.ModuleDict()
 		self.depth = len(n_hidden)
 		self.dropout = c.use_dropout
 		self.p_dropout = c.dropout_rate
@@ -70,6 +71,8 @@ class ICNN(torch.nn.Module):
 
 		self.layers[str(self.depth)] = convexLinear(n_hidden[self.depth-1], n_output).float()
 		self.skip_layers[str(self.depth)] = convexLinear(n_input, n_output).float()
+
+		self.global_pooling =torch.nn.AdaptiveAvgPool1d(output_size=1)
 
 	def forward(self, x):
 		# Get angle
@@ -140,6 +143,9 @@ class ICNN(torch.nn.Module):
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
 		y = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
+
+		z=self.global_pooling(y)
+		print(z.shape)
 		return y
 
 def init_weights(m):
@@ -200,6 +206,8 @@ class ICNN3D(torch.nn.Module):
 
 		self.layers[str(self.depth)] = convexLinear(n_hidden[self.depth-1], n_output).float()
 		self.skip_layers[str(self.depth)] = convexLinear(n_input, n_output).float()
+
+
 
 	def forward(self, x):
 		# Get angle
@@ -483,7 +491,7 @@ class ICNN3D_global_Taylor(torch.nn.Module):
 
 		self.layers[str(self.depth)] = convexLinear(n_hidden[self.depth-1], n_output).float()
 		self.skip_layers[str(self.depth)] = convexLinear(n_input, n_output).float()
-
+		self.global_pooling =torch.nn.AdaptiveAvgPool1d(output_size=1)
 	def forward(self, x):
 		# Get angle
 		if self.anisotropy_flag is not None:
@@ -583,4 +591,8 @@ class ICNN3D_global_Taylor(torch.nn.Module):
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
 		y = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
-		return y
+
+		z=self.global_pooling(y.transpose(0,1))
+		#print(f'Z: {z.shape}')
+		
+		return z
