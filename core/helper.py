@@ -24,10 +24,12 @@ def initCUDA(cudaID):
     else:
         device = torch.device('cpu')
         torch.set_default_tensor_type(torch.DoubleTensor)
+
     print("Setting device to: ",cudaID)
     x=torch.rand(1,1)
     print('Test: ',x.device)
     print('-----------------------------------------------------\n')
+    return device
 
 
 
