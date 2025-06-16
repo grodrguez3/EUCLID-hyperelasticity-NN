@@ -217,3 +217,37 @@ def parse_quad4_from_feb(feb_file, surface_name=None):
             quad_dict[qid] = nodes
 
     return quad_dict
+
+
+def map_pressure_to_elements(connectivity, pressure_nodes):
+    """
+    Parameters
+    ----------
+    connectivity : list of tuples
+        Each tuple is (elem_id, node1, node2, node3, ..., nodeK).
+    pressure_nodes : set or list of ints
+        Node IDs that carry a pressure boundary condition.
+
+    Returns
+    -------
+    mapping : dict
+        { elem_id: {
+            'all_nodes':    [n1, n2, …, nK],
+            'pressure_nodes': [ni, …]   # only those nodes in this element with pressure
+          }
+        }
+        Only elements with at least one pressure node are included.
+    """
+    # convert to set for O(1) membership tests
+    P = set(pressure_nodes)
+
+    mapping = {}
+    for entry in connectivity:
+        elem_id, *nodes = entry
+        applied = [n for n in nodes if n in P]
+        if applied:
+            mapping[elem_id] = {
+                'all_nodes':     nodes,
+                'pressure_nodes': applied
+            }
+    return mapping

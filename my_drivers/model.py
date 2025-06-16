@@ -6,6 +6,10 @@ from core import *
 import config as c
 
 
+def init_weights(m):
+	if isinstance(m, torch.nn.Linear):
+		torch.nn.init.xavier_uniform_(m.weight)
+
 class convexLinear(torch.nn.Module):
 	"""
 
@@ -468,7 +472,7 @@ class ICNN3D_global_Taylor(torch.nn.Module):
 	Output: 			NN-based strain energy density (W_NN)
 
 	"""
-	def __init__(self, n_input, n_hidden, n_output, use_dropout, dropout_rate, anisotropy_flag=None, fiber_type=None):
+	def __init__(self, n_input, n_hidden, n_output, use_dropout, dropout_rate, centroids=True,anisotropy_flag=None, fiber_type=None):
 		super(ICNN3D_global_Taylor, self).__init__()
 
 		# Create Module dicts for the hidden and skip-connection layers
@@ -479,9 +483,13 @@ class ICNN3D_global_Taylor(torch.nn.Module):
 		self.p_dropout = c.dropout_rate
 		self.anisotropy_flag = anisotropy_flag
 		self.fiber_type = fiber_type
+		self.centroids = centroids
 
 		if self.anisotropy_flag is not None:
 			self.alpha = torch.nn.Parameter((torch.randn(1,1)))#torch.tensor([0.25])#
+		if self.centroids:
+			
+			n_input+=3
 
 		self.layers[str(0)] = torch.nn.Linear(n_input, n_hidden[0]).float()
 		# Create create NN with number of elements in n_hidden as depth
@@ -516,10 +524,11 @@ class ICNN3D_global_Taylor(torch.nn.Module):
 		F32 = x[:, 7:8]
 		F33 = x[:, 8:9]
 
-		#Centroid positions
-		Xc  = x[:,  9:10]
-		Yc  = x[:, 10:11]
-		Zc  = x[:, 11:12]
+		if self.centroids:
+			#Centroid positions
+			Xc  = x[:,  9:10]
+			Yc  = x[:, 10:11]
+			Zc  = x[:, 11:12]
 
 		# 1) Build the Right Cauchy‐Green tensor C = F^T F, component‐wise:
 		#    C11 = F11^2 + F21^2 + F31^2
@@ -575,7 +584,10 @@ class ICNN3D_global_Taylor(torch.nn.Module):
 
 
 		# Concatenate feature
-		x_input = torch.cat((K1,K2,K3,Xc,Yc,Zc),dim=1).float()
+		if self.centroids:
+			x_input = torch.cat((K1,K2,K3,Xc,Yc,Zc),dim=1).float()
+		else:
+			x_input = torch.cat((K1,K2,K3),dim=1).float()
 
 		z = x_input.clone()
 		z = self.layers[str(0)](z)
