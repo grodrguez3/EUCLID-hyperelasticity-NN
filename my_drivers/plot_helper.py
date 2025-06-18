@@ -35,15 +35,16 @@ def plot_cube_faces(
             xl, yl = 'x','y'
             title = f"z = {zs[idx]:.2f}"
         elif axis == 'y':
-            Fi = M[idx,:,:]
-            Xi = X[idx,:,:]
-            Yi = Z[idx,:,:]
-            xl, yl = 'x','z'
-            title = f"y = {ys[idx]:.2f}"
-        else:  # axis == 'x'
+
             Fi = M[:,idx,:]
             Xi = Y[:,idx,:]
             Yi = Z[:,idx,:]
+            xl, yl = 'x','z'
+            title = f"y = {ys[idx]:.2f}"
+        else:  # axis == 'x'
+            Fi = M[idx,:,:]
+            Xi = X[idx,:,:]
+            Yi = Z[idx,:,:]
             xl, yl = 'y','z'
             title = f"x = {xs[idx]:.2f}"
 

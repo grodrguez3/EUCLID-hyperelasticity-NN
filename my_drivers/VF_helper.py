@@ -21,6 +21,11 @@ def construct_VF(V_NN,delta_xyz):
     )
     return Vf
 
+
+
+
+
+
 def construct_VF_gradients(V_NN: torch.Tensor, delta_xyz: torch.Tensor) -> torch.Tensor:
     """
     V_NN:  either shape (30,), (30,1), or (1,30)
