@@ -2,7 +2,7 @@ import torch
 
 
 def calculate_point(centroids, state):
-    delta=centroids[:,:,state]-centroids[:,:,0]
+    delta=centroids[:,:,state] #-centroids[:,:,0]
     return delta
 
 
@@ -60,17 +60,17 @@ def construct_VF_gradients(V_NN: torch.Tensor, delta_xyz: torch.Tensor) -> torch
     c7,c8,c9 = c[7],c[8],c[9]
 
     # compute the nine partials
-    dVx_dx = -a1 - 2*a4*dx -    a7*dy -    a8*dz
-    dVx_dy = -a2 -    a7*dx - 2*a5*dy -    a9*dz
-    dVx_dz = -a3 -    a8*dx -    a9*dy - 2*a6*dz
+    dVx_dx = +a1 + 2*a4*dx +    a7*dy +    a8*dz
+    dVx_dy = +a2 +    a7*dx + 2*a5*dy +    a9*dz
+    dVx_dz = +a3 +    a8*dx +    a9*dy + 2*a6*dz
 
-    dVy_dx = -b1 - 2*b4*dx -    b7*dy -    b8*dz
-    dVy_dy = -b2 -    b7*dx - 2*b5*dy -    b9*dz
-    dVy_dz = -b3 -    b8*dx -    b9*dy - 2*b6*dz
+    dVy_dx = +b1 + 2*b4*dx +    b7*dy +    b8*dz
+    dVy_dy = +b2 +    b7*dx + 2*b5*dy +    b9*dz
+    dVy_dz = +b3 +    b8*dx +    b9*dy + 2*b6*dz
 
-    dVz_dx = -c1 - 2*c4*dx -    c7*dy -    c8*dz
-    dVz_dy = -c2 -    c7*dx - 2*c5*dy -    c9*dz
-    dVz_dz = -c3 -    c8*dx -    c9*dy - 2*c6*dz
+    dVz_dx = +c1 + 2*c4*dx +    c7*dy +    c8*dz
+    dVz_dy = +c2 +    c7*dx + 2*c5*dy +    c9*dz
+    dVz_dz = +c3 +    c8*dx +    c9*dy + 2*c6*dz
 
     # pack into (Nelements, 3, 3)
     row1 = torch.stack((dVx_dx, dVx_dy, dVx_dz), dim=1)
