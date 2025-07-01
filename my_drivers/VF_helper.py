@@ -21,7 +21,20 @@ def construct_VF(V_NN,delta_xyz):
     )
     return Vf
 
-
+def construct_VF_MD(V_NN,delta_xyz):
+    Vf = (
+        V_NN[0]
+        + V_NN[1] * delta_xyz[:,0,:]
+        + V_NN[2] * delta_xyz[:,1,:]
+        + V_NN[3] * delta_xyz[:,2,:]
+        + V_NN[4] * delta_xyz[:,0,:]**2
+        + V_NN[5] * delta_xyz[:,1,:]**2
+        + V_NN[6] * delta_xyz[:,2,:]**2
+        + V_NN[7] * (delta_xyz[:,0,:] * delta_xyz[:,1,:])
+        + V_NN[8] * (delta_xyz[:,0,:] * delta_xyz[:,2,:])
+        + V_NN[9] * (delta_xyz[:,1,:] * delta_xyz[:,2,:])
+    )
+    return Vf
 
 
 
@@ -78,7 +91,58 @@ def construct_VF_gradients(V_NN: torch.Tensor, delta_xyz: torch.Tensor) -> torch
     row3 = torch.stack((dVz_dx, dVz_dy, dVz_dz), dim=1)
     
     return torch.stack((row1, row2, row3), dim=1)
+def construct_VF_gradients_MD(V_NN: torch.Tensor, delta_xyz: torch.Tensor) -> torch.Tensor:
+    """
+    V_NN:  either shape (30,), (30,1), or (1,30)
+    delta_xyz: shape (Nelements, 3)
+    returns grad_V of shape (Nelements, 3, 3)
+    """
+    # flatten to (30,)
+    coeffs = V_NN.squeeze()
+    if coeffs.numel() != 30:
+        raise ValueError(f"expected 30 coefficients, got {coeffs.shape}")
 
+    dx = delta_xyz[:, 0,:]
+    dy = delta_xyz[:, 1,:]
+    dz = delta_xyz[:, 2,:]
+
+    # split into three 10-coefficient chunks
+    a = coeffs[ 0:10]  # Vx
+    b = coeffs[10:20]  # Vy
+    c = coeffs[20:30]  # Vz
+
+    # alias the ones we need
+    a1,a2,a3 = a[1],a[2],a[3]
+    a4,a5,a6 = a[4],a[5],a[6]
+    a7,a8,a9 = a[7],a[8],a[9]
+
+    b1,b2,b3 = b[1],b[2],b[3]
+    b4,b5,b6 = b[4],b[5],b[6]
+    b7,b8,b9 = b[7],b[8],b[9]
+
+    c1,c2,c3 = c[1],c[2],c[3]
+    c4,c5,c6 = c[4],c[5],c[6]
+    c7,c8,c9 = c[7],c[8],c[9]
+
+    # compute the nine partials
+    dVx_dx = +a1 + 2*a4*dx +    a7*dy +    a8*dz
+    dVx_dy = +a2 +    a7*dx + 2*a5*dy +    a9*dz
+    dVx_dz = +a3 +    a8*dx +    a9*dy + 2*a6*dz
+
+    dVy_dx = +b1 + 2*b4*dx +    b7*dy +    b8*dz
+    dVy_dy = +b2 +    b7*dx + 2*b5*dy +    b9*dz
+    dVy_dz = +b3 +    b8*dx +    b9*dy + 2*b6*dz
+
+    dVz_dx = +c1 + 2*c4*dx +    c7*dy +    c8*dz
+    dVz_dy = +c2 +    c7*dx + 2*c5*dy +    c9*dz
+    dVz_dz = +c3 +    c8*dx +    c9*dy + 2*c6*dz
+
+    # pack into (Nelements, 3, 3)
+    row1 = torch.stack((dVx_dx, dVx_dy, dVx_dz), dim=1)
+    row2 = torch.stack((dVy_dx, dVy_dy, dVy_dz), dim=1)
+    row3 = torch.stack((dVz_dx, dVz_dy, dVz_dz), dim=1)
+    
+    return torch.stack((row1, row2, row3), dim=1)
 
 def Voigt_to_3d(stress_tensor):
     N = stress_tensor.shape[0]

@@ -605,6 +605,7 @@ class ICNN3D_global_Taylor(torch.nn.Module):
 			if self.training:
 				if self.dropout:
 					z = torch.nn.functional.dropout(z,p=self.p_dropout)
+
 		y = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
 
 		z=self.global_pooling(y.transpose(0,1))
@@ -940,4 +941,56 @@ class ICNN3D_global_Taylor_FCN(torch.nn.Module):
 		#print(f'Z: {z.shape}')
 		
 		return z
-	
+
+
+import torch
+import torch.nn as nn
+
+class SmallCNN1DEncoder(nn.Module):
+    """
+    A lightweight 1D convolutional encoder for inputs of shape (B, 6, 1000).
+    Outputs (B, 1, 30) with fewer than ~40K parameters.
+    """
+    def __init__(self, in_channels=6, num_coeffs=30):
+        super(SmallCNN1DEncoder, self).__init__()
+        # Conv Block 1: 6 -> 32
+        self.conv1 = nn.Conv1d(in_channels, 32, kernel_size=3, padding=1)
+        # -> (B, 32, 1000)
+        self.pool1 = nn.MaxPool1d(2)
+        # -> (B, 32, 500)
+
+        # Conv Block 2: 32 -> 64
+        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)
+        # -> (B, 64, 500)
+        self.pool2 = nn.MaxPool1d(2)
+        # -> (B, 64, 250)
+
+        # Conv Block 3: 64 -> 128
+        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
+        # -> (B, 128, 250)
+        self.pool3 = nn.MaxPool1d(2)
+        # -> (B, 128, 125)
+
+        # Global average pooling: 125 -> 1
+        self.global_pool = nn.AdaptiveAvgPool1d(1)
+        # -> (B, 128, 1)
+
+        # Linear head: 128 -> 30
+        self.fc = nn.Linear(128, num_coeffs)
+        # -> (B, 30)
+
+    def forward(self, x):
+        # x: (B, 6, 1000)
+        x = nn.functional.relu(self.conv1(x))
+        x = self.pool1(x)
+
+        x = nn.functional.relu(self.conv2(x))
+        x = self.pool2(x)
+
+        x = nn.functional.relu(self.conv3(x))
+        x = self.pool3(x)
+
+        x = self.global_pool(x)     # -> (B, 128, 1)
+        x = x.squeeze(-1)           # -> (B, 128)
+        x = self.fc(x)              # -> (B, 30)
+        return x.unsqueeze(1)       # -> (B, 1, 30)
