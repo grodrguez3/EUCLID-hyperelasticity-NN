@@ -4,7 +4,9 @@ sys.path.insert(0, "../")
 from core import *
 #config
 import config as c
-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 def init_weights(m):
 	if isinstance(m, torch.nn.Linear):
@@ -943,54 +945,46 @@ class ICNN3D_global_Taylor_FCN(torch.nn.Module):
 		return z
 
 
-import torch
-import torch.nn as nn
 
-class SmallCNN1DEncoder(nn.Module):
+
+class GlobalSmallCNN1DEncoder(nn.Module):
     """
-    A lightweight 1D convolutional encoder for inputs of shape (B, 6, 1000).
-    Outputs (B, 1, 30) with fewer than ~40K parameters.
+    Input:  x of shape (N_elements=1000, in_channels=6, timesteps=12)
+    Output: theta of shape (1, num_coeffs=30)
     """
-    def __init__(self, in_channels=6, num_coeffs=30):
-        super(SmallCNN1DEncoder, self).__init__()
-        # Conv Block 1: 6 -> 32
-        self.conv1 = nn.Conv1d(in_channels, 32, kernel_size=3, padding=1)
-        # -> (B, 32, 1000)
-        self.pool1 = nn.MaxPool1d(2)
-        # -> (B, 32, 500)
+    def __init__(self, in_channels=6, num_coeffs=30, lat_dim=64):
+        super().__init__()
+        # per‐element time encoder
+        self.conv1 = nn.Conv1d(in_channels, 32, kernel_size=3, padding=1)   # → (N,32,12)
+        self.pool1 = nn.MaxPool1d(2)                                        # → (N,32,6)
+        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)            # → (N,64,6)
+        self.pool2 = nn.MaxPool1d(2)                                        # → (N,64,3)
+        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, padding=1)           # → (N,128,3)
+        self.global_time_pool = nn.AdaptiveAvgPool1d(1)                     # → (N,128,1)
 
-        # Conv Block 2: 32 -> 64
-        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)
-        # -> (B, 64, 500)
-        self.pool2 = nn.MaxPool1d(2)
-        # -> (B, 64, 250)
+        # per‐element embedding
+        self.element_fc = nn.Linear(128, lat_dim)                           # → (N,lat_dim)
 
-        # Conv Block 3: 64 -> 128
-        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
-        # -> (B, 128, 250)
-        self.pool3 = nn.MaxPool1d(2)
-        # -> (B, 128, 125)
-
-        # Global average pooling: 125 -> 1
-        self.global_pool = nn.AdaptiveAvgPool1d(1)
-        # -> (B, 128, 1)
-
-        # Linear head: 128 -> 30
-        self.fc = nn.Linear(128, num_coeffs)
-        # -> (B, 30)
+        # global head
+        self.final_fc = nn.Linear(lat_dim, num_coeffs)                      # → (1,30)
 
     def forward(self, x):
-        # x: (B, 6, 1000)
-        x = nn.functional.relu(self.conv1(x))
-        x = self.pool1(x)
+        # x: (N_elements, 6, 12)
+        h = F.relu(self.conv1(x))
+        h = self.pool1(h)
 
-        x = nn.functional.relu(self.conv2(x))
-        x = self.pool2(x)
+        h = F.relu(self.conv2(h))
+        h = self.pool2(h)
 
-        x = nn.functional.relu(self.conv3(x))
-        x = self.pool3(x)
+        h = F.relu(self.conv3(h))
+        h = self.global_time_pool(h)      # → (N,128,1)
+        h = h.squeeze(-1)                 # → (N,128)
 
-        x = self.global_pool(x)     # -> (B, 128, 1)
-        x = x.squeeze(-1)           # -> (B, 128)
-        x = self.fc(x)              # -> (B, 30)
-        return x.unsqueeze(1)       # -> (B, 1, 30)
+        h = F.relu(self.element_fc(h))    # → (N,lat_dim)
+
+        # aggregate over the element axis
+        g = h.mean(dim=0, keepdim=True)   # → (1,lat_dim)
+
+        # map to Taylor coefficients
+        theta = self.final_fc(g)          # → (1,30)
+        return theta.squeeze()
