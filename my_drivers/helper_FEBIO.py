@@ -69,6 +69,80 @@ def read_multi_ste_output2(file, p=False):
 
     return state_dict
 
+
+
+def read_multi_ste_output_VOIGT(file, p=False):
+    """
+    Reads a STE output CSV where the first column is unused, and the remaining
+    columns are grouped per-state either as:
+      • 3‐field: [x, y, z]
+      • 6‐field: [xx, yy, zz, yz, xz, xy]
+      • 9‐field: [F11, F12, F13, F21, F22, F23, F31, F32, F33]
+    Returns a dict:
+      {
+        1: {'x': […], 'y': […], 'z': […]},
+        2: {...},
+        …
+      }
+    or for 6‐field:
+      {
+        1: {'xx': […], …, 'yz': […]},
+        …
+      }
+    or for 9‐field:
+      {
+        1: {'F11': […], …, 'F33': […]},
+        …
+      }
+    """
+    # 1) Load & drop the first (unused) column
+    df = pd.read_csv(file, header=None)
+    df = df.drop(columns=0)
+
+    # 2) Determine whether it's a 3-, 6- or 9-field file
+    ncols = df.shape[1]
+    if   ncols % 9 == 0:
+        fields = ['F11','F12','F13',
+                  'F21','F22','F23',
+                  'F31','F32','F33']
+    elif ncols % 6 == 0:
+        fields = ['xx','yy','zz','xy','yz','xz'] #https://help.febio.org/FEBioTheory/FEBio_tm_3-4-Section-2.1.html
+    elif ncols % 3 == 0:
+        fields = ['x','y','z']
+    else:
+        fields = ['element']
+        #raise ValueError(f"Unexpected number of data columns: {ncols}")
+
+    n_fields = len(fields)
+    n_states = ncols // n_fields
+
+    # 3) Build the per‐state dict
+    state_dict = {}
+    for i in range(n_states):
+        block = df.iloc[:, i*n_fields : (i+1)*n_fields]
+        state_dict[i+1] = {
+            fields[j]: block.iloc[:, j].tolist()
+            for j in range(n_fields)
+        }
+
+    # 4) Optional sanity print
+    if p:
+        print(f"Detected {n_fields}-field blocks → {fields}")
+        print(f"Number of states: {n_states}")
+        for s, data in state_dict.items():
+            counts = ", ".join(f"{f}={len(data[f])}" for f in fields)
+            print(f" State {s}: {counts}")
+
+    return state_dict
+
+
+
+
+
+
+
+
+
 def parse_states(filename):
     """
     Parses a file with repeating blocks like:

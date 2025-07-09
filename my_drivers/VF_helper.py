@@ -224,6 +224,34 @@ def Voigt_to_3d(stress_tensor):
 
     return stress_tensor_3d
 
+
+def Voigt_to_3d_v2(stress_tensor):
+    N = stress_tensor.shape[0]
+    states=stress_tensor.shape[2]
+    stress_tensor_3d = torch.zeros(N, 3, 3,states,
+                    device=stress_tensor.device,
+                    dtype=stress_tensor.dtype)
+
+    # diagonals
+    stress_tensor_3d[:,0,0] = stress_tensor[:,0]   # stress_tensor_3d_xx
+    stress_tensor_3d[:,1,1] = stress_tensor[:,1]   # stress_tensor_3d_yy
+    stress_tensor_3d[:,2,2] = stress_tensor[:,2]   # stress_tensor_3d_zz
+
+    # off‐diagonals (symmetric)
+    stress_tensor_3d[:,0,1] = stress_tensor[:,5]   # stress_tensor_3d_xy
+    stress_tensor_3d[:,1,0] = stress_tensor[:,5]
+
+    stress_tensor_3d[:,0,2] = stress_tensor[:,4]   # stress_tensor_3d_xz
+    stress_tensor_3d[:,2,0] = stress_tensor[:,4]
+
+    stress_tensor_3d[:,1,2] = stress_tensor[:,3]   # stress_tensor_3d_yz
+    stress_tensor_3d[:,2,1] = stress_tensor[:,3]
+
+    return stress_tensor_3d
+
+
+
+
 def taylor3(x, y, z, coeffs):
     """
     Evaluate a 3-var quadratic Taylor expansion
