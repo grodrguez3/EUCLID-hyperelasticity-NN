@@ -70,6 +70,68 @@ def read_multi_ste_output2(file, p=False):
     return state_dict
 
 
+def read_multi_stepped_output_txt(file, p=False):
+    """
+    Reads a file containing repeated blocks of the form:
+      *Step  = <step_idx>
+      *Time  = <time>
+      *Data  = <field1>;<field2>;...;<fieldN>
+      <id> val1 val2 ... valN
+      ...
+    and returns a dict:
+      {
+        <step_idx>: {
+           '<field1>': [val1, val1, ...],
+           '<field2>': [val2, val2, ...],
+            …
+        },
+        …
+      }
+    """
+    result = {}
+    with open(file, 'r') as f:
+        lines = f.readlines()
+
+    i = 0
+    while i < len(lines):
+        raw = lines[i].strip()
+        # strip leading '*' so we catch '*Step' or 'Step'
+        line = raw.lstrip('*').strip()
+        if line.startswith('Step'):
+            # parse step index
+            step = int(line.split('=', 1)[1])
+            # skip "*Time" line
+            # parse "*Data" line
+            data_line = lines[i+2].strip().lstrip('*')
+            _, fields_str = data_line.split('=', 1)
+            fields = [fld.strip() for fld in fields_str.split(';') if fld.strip()]
+            n_fields = len(fields)
+
+            # collect data rows
+            state_data = {fld: [] for fld in fields}
+            j = i + 3
+            while j < len(lines):
+                ln = lines[j].strip()
+                if not ln or ln.lstrip('*').strip().startswith('Step'):
+                    break
+                parts = ln.split()
+                vals = parts[1:1+n_fields]
+                for fld, v in zip(fields, vals):
+                    state_data[fld].append(float(v))
+                j += 1
+
+            result[step] = state_data
+            i = j
+        else:
+            i += 1
+
+    if p:
+        for step, data in result.items():
+            counts = ", ".join(f"{fld}={len(vals)}" for fld, vals in data.items())
+            print(f"Step {step}: {counts}")
+
+    return result
+
 
 def read_multi_ste_output_VOIGT(file, p=False):
     """
@@ -324,4 +386,46 @@ def map_pressure_to_elements(connectivity, pressure_nodes):
                 'all_nodes':     nodes,
                 'pressure_nodes': applied
             }
+    return mapping
+
+
+def map_facets_to_elements(connectivity, facets):
+    """
+    Parameters
+    ----------
+    connectivity : list of tuples
+        Each tuple is (elem_id, node1, node2, ..., nodeK).
+    facets : list of tuples
+        Each tuple is (facet_id, n1, n2, n3, n4).
+
+    Returns
+    -------
+    mapping : dict
+        {
+          facet_id: {
+            'facet_nodes':    [n1, n2, n3, n4],
+            'element_ids':    [e1, e2, …]    # all elements that contain these 4 nodes
+          },
+          …
+        }
+        Only facets that are found in at least one element are included.
+    """
+    mapping = {}
+    for facet_entry in facets:
+        facet_id, *f_nodes = facet_entry
+        fset = set(f_nodes)
+
+        # find all elems whose node-set contains these 4 nodes
+        matches = []
+        for elem_entry in connectivity:
+            elem_id, *e_nodes = elem_entry
+            if fset.issubset(e_nodes):
+                matches.append(elem_id)
+
+        if matches:
+            mapping[facet_id] = {
+                'facet_nodes':   f_nodes,
+                'element_ids':   matches
+            }
+
     return mapping

@@ -511,8 +511,6 @@
 			<element_data data="x"/>
 			<element_data data="y"/>
 			<element_data data="z"/>
-			<element_data data="Fxx;Fxy;Fxz;Fyx;Fyy;Fyz;Fzx;Fzy;Fzz" file="deformation.txt"/>
-			<element_data data="x;y;z" file="centroids.txt"/>
 		</logfile>
 	</Output>
 </febio_spec>
