@@ -138,7 +138,7 @@ def read_multi_ste_output_VOIGT(file, p=False):
     Reads a STE output CSV where the first column is unused, and the remaining
     columns are grouped per-state either as:
       • 3‐field: [x, y, z]
-      • 6‐field: [xx, yy, zz, yz, xz, xy]
+      • 6‐field: [xx, yy, zz, xy, yz, xz]
       • 9‐field: [F11, F12, F13, F21, F22, F23, F31, F32, F33]
     Returns a dict:
       {
