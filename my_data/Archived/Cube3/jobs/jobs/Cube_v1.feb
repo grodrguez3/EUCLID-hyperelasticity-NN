@@ -506,6 +506,17 @@
 			<var type="displacement"/>
 			<var type="stress"/>
 			<var type="relative volume"/>
+			<var type="surface traction"/>
+			<var type="nodal surface traction"/>
+			<var type="contact traction"/>
+			<var type="nodal contact traction"/>
+			<var type="contact force"/>
+			<var type="reaction forces"/>
+			<var type="rigid force"/>
+			<var type="surface reaction force"/>
+			<var type="discrete element force"/>
+			<var type="discrete element signed force"/>
+			<var type="body force"/>
 		</plotfile>
 		<logfile>
 			<element_data data="x"/>
@@ -513,6 +524,7 @@
 			<element_data data="z"/>
 			<element_data data="Fxx;Fxy;Fxz;Fyx;Fyy;Fyz;Fzx;Fzy;Fzz" file="deformation.txt"/>
 			<element_data data="x;y;z" file="centroids.txt"/>
+			<element_data data="discrete element force"/>
 		</logfile>
 	</Output>
 </febio_spec>
