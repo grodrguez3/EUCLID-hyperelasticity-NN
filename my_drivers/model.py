@@ -32,7 +32,7 @@ class convexLinear(torch.nn.Module):
 		torch.nn.init.kaiming_uniform_(self.weights, a=np.emath.sqrt(5))
 
 	def forward(self, x):
-		w_times_x= torch.mm(x, torch.nn.functional.softplus(self.weights.t()))
+		w_times_x= torch.mm(x, torch.nn.functional.relu(self.weights.t()))
 		return w_times_x
 
 class ICNN(torch.nn.Module):
@@ -156,7 +156,7 @@ class ICNN(torch.nn.Module):
 
 def init_weights(m):
 	if isinstance(m, torch.nn.Linear):
-		torch.nn.init.xavier_uniform_(m.weight)
+		torch.nn.init.kaiming_uniform_(m.weight)
 
 def print_model_arch(model):
 	print('\n\n','-'*80,'\n',model,'\n','-'*80,'\n\n')
@@ -764,7 +764,7 @@ class ICNN3D_Taylor_multifield(torch.nn.Module):
 			skip = self.skip_layers[str(layer)](x_input)
 			z = self.layers[str(layer)](z)
 			z += skip
-			z = torch.nn.functional.softplus(z)
+			z = torch.nn.functional.relu(z)
 			if c.use_sftpSquared:
 				z = c.scaling_sftpSq*torch.square(z)
 			if self.training:
@@ -931,7 +931,7 @@ class ICNN3D_Taylor_multifield_with_neg(torch.nn.Module):
 			skip = self.skip_layers[str(layer)](x_input)
 			z = self.layers[str(layer)](z)
 			z += skip
-			z = torch.nn.functional.softplus(z)
+			z = torch.nn.functional.relu(z)
 			if c.use_sftpSquared:
 				z = c.scaling_sftpSq*torch.square(z)
 			if self.training:
