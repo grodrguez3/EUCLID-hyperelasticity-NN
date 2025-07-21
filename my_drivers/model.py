@@ -1110,45 +1110,179 @@ class ICNN3D_global_Taylor_FCN(torch.nn.Module):
 
 
 
+class Taylor_with_heads(torch.nn.Module):
+	"""
 
-class GlobalSmallCNN1DEncoder(nn.Module):
-    """
-    Input:  x of shape (N_elements=1000, in_channels=6, timesteps=12)
-    Output: theta of shape (1, num_coeffs=30)
-    """
-    def __init__(self, in_channels=6, num_coeffs=30, lat_dim=64):
-        super().__init__()
-        # per‐element time encoder
-        self.conv1 = nn.Conv1d(in_channels, 32, kernel_size=3, padding=1)   # → (N,32,12)
-        self.pool1 = nn.MaxPool1d(2)                                        # → (N,32,6)
-        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, padding=1)            # → (N,64,6)
-        self.pool2 = nn.MaxPool1d(2)                                        # → (N,64,3)
-        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, padding=1)           # → (N,128,3)
-        self.global_time_pool = nn.AdaptiveAvgPool1d(1)                     # → (N,128,1)
+	Material model based on Input convex neural network.
 
-        # per‐element embedding
-        self.element_fc = nn.Linear(128, lat_dim)                           # → (N,lat_dim)
+	Initialize:
+	n_input:			Input layer size
+	n_hidden:			Hidden layer size / number of neurons
+	n_output:			Output layer size
+	use_dropout:		Activate dropout during training
+	dropout_rate:		Dropout probability.
+	anisotropy_flag:	{single, double} -> type of fiber families
+	fiber_type:			{mirror, general} -> type of fiber arrangement in case of two (or more) fiber families.
 
-        # global head
-        self.final_fc = nn.Linear(lat_dim, num_coeffs)                      # → (1,30)
+	Inputs: 			Deformation gradient in the form: (F11,F12,F21,F22)
+	Output: 			NN-based strain energy density (W_NN)
 
-    def forward(self, x):
-        # x: (N_elements, 6, 12)
-        h = F.relu(self.conv1(x))
-        h = self.pool1(h)
+	"""
+	def __init__(self, n_input, n_hidden, n_output, use_dropout, dropout_rate, centroids=True,p_fields=1,anisotropy_flag=None, fiber_type=None):
+		super(Taylor_with_heads, self).__init__()
 
-        h = F.relu(self.conv2(h))
-        h = self.pool2(h)
+		# Create Module dicts for the hidden and skip-connection layers
+		self.layers = torch.nn.ModuleDict()
+		self.skip_layers = torch.nn.ModuleDict()
+		self.depth = len(n_hidden)
+		self.dropout = c.use_dropout
+		self.p_dropout = c.dropout_rate
+		self.anisotropy_flag = anisotropy_flag
+		self.fiber_type = fiber_type
+		self.centroids = centroids
+		self.p_fields  = p_fields
+		self.heads = nn.ModuleList([
+			nn.Linear(n_hidden[-1], n_output).float()  # each maps trunk‐dim → field‐vector length
+			for _ in range(p_fields)
+		])
 
-        h = F.relu(self.conv3(h))
-        h = self.global_time_pool(h)      # → (N,128,1)
-        h = h.squeeze(-1)                 # → (N,128)
+		if self.centroids:
+			
+			n_input+=3
 
-        h = F.relu(self.element_fc(h))    # → (N,lat_dim)
+		self.layers[str(0)] = torch.nn.Linear(n_input, n_hidden[0]).float()
+		# Create create NN with number of elements in n_hidden as depth
+		for i in range(1, self.depth):
+			self.layers[str(i)] = torch.nn.Linear(n_hidden[i-1], n_hidden[i]).float()
+			self.skip_layers[str(i)] = torch.nn.Linear(n_input, n_hidden[i]).float()
 
-        # aggregate over the element axis
-        g = h.mean(dim=0, keepdim=True)   # → (1,lat_dim)
+	#	self.layers[str(self.depth)] = torch.nn.Linear(n_hidden[self.depth-1], n_output* self.p_fields).float()
+	#	self.skip_layers[str(self.depth)] = torch.nn.Linear(n_input, n_output* self.p_fields).float()
 
-        # map to Taylor coefficients
-        theta = self.final_fc(g)          # → (1,30)
-        return theta.squeeze()
+		self.global_pooling =torch.nn.AdaptiveAvgPool1d(output_size=1)
+
+	def forward(self, x):
+		# Get angle
+
+		#Part of the input is the centroids, to avoid assuming homogenenous materials
+
+		# For clarity, we slice out each component as a (batch_size×1) tensor:
+		F11 = x[:, 0:1]  # shape = (B,1)
+		F12 = x[:, 1:2]
+		F13 = x[:, 2:3]
+
+		F21 = x[:, 3:4]
+		F22 = x[:, 4:5]
+		F23 = x[:, 5:6]
+
+		F31 = x[:, 6:7]
+		F32 = x[:, 7:8]
+		F33 = x[:, 8:9]
+
+		if self.centroids:
+			#Centroid positions
+			Xc  = x[:,  9:10]
+			Yc  = x[:, 10:11]
+			Zc  = x[:, 11:12]
+
+		# 1) Build the Right Cauchy‐Green tensor C = F^T F, component‐wise:
+		#    C11 = F11^2 + F21^2 + F31^2
+		C11 = F11**2 + F21**2 + F31**2
+
+		#    C12 = F11·F12 + F21·F22 + F31·F32
+		C12 = F11*F12 + F21*F22 + F31*F32
+
+		#    C13 = F11·F13 + F21·F23 + F31·F33
+		C13 = F11*F13 + F21*F23 + F31*F33
+
+		#    C22 = F12^2 + F22^2 + F32^2
+		C22 = F12**2 + F22**2 + F32**2
+
+		#    C23 = F12·F13 + F22·F23 + F32·F33
+		C23 = F12*F13 + F22*F23 + F32*F33
+
+		#    C33 = F13^2 + F23^2 + F33^2
+		C33 = F13**2 + F23**2 + F33**2
+
+		# (Note: C21 = C12, C31 = C13, C32 = C23, but we only need them for invariants.)
+
+		# 2) Compute the three invariants of C:
+
+		#   I1 = trace(C) = C11 + C22 + C33
+		I1 = C11 + C22 + C33
+
+		#   I2 = sum of principal 2×2 minors of C:
+		#        I2 =  C11·C22 + C11·C33 + C22·C33  –  (C12^2 + C13^2 + C23^2)
+		I2 = (C11 * C22) + (C11 * C33) + (C22 * C33) - (C12**2 + C13**2 + C23**2)
+
+		#   I3 = det(C).  But det(C) = (det F)².  So first form det(F):
+		detF = (
+			F11 * (F22*F33 - F23*F32)
+		- F12 * (F21*F33 - F23*F31)
+		+ F13 * (F21*F32 - F22*F31)
+		)
+		I3 = detF**2
+
+		# 3) Now form the modified invariants K1, K2, K3:
+
+		#    J  = sqrt(I3)
+		J = torch.sqrt(I3)
+
+		#    K1 = I1 * I3^(–1/3) – 3.0
+		K1 = I1 * torch.pow(I3, -1.0/3.0) - 3.0
+
+		#    K2 = I2 * I3^(–2/3) – 3.0
+		K2 = I2 * torch.pow(I3, -2.0/3.0) - 3.0
+
+		#    K3 = (J - 1.0)^2
+		K3 = (J - 1.0)**2
+
+
+		# Concatenate feature
+		if self.centroids:
+			x_input = torch.cat((K1,K2,K3,Xc,Yc,Zc),dim=1).float()
+		else:
+			x_input = torch.cat((K1,K2,K3),dim=1).float()
+
+		z = x_input.clone()
+		z = self.layers[str(0)](z)
+
+		for layer in range(1,self.depth):
+			skip = self.skip_layers[str(layer)](x_input)
+			z = self.layers[str(layer)](z)
+			z += skip
+			z = torch.nn.functional.relu(z)
+			if c.use_sftpSquared:
+				z = c.scaling_sftpSq*torch.square(z)
+			if self.training:
+				if self.dropout:
+					z = torch.nn.functional.dropout(z,p=self.p_dropout)
+
+		#y = self.layers[str(self.depth)](z) + self.skip_layers[str(self.depth)](x_input)
+
+
+		#z=self.global_pooling(y.transpose(0,1))
+
+		#g = z.view(self.p_fields, -1) #This is 3,30
+		field_list = [ head(z) for head in self.heads ]
+		# each element is (batch, n_output)
+
+		# Stack into a tensor of shape (batch, p_fields, n_output)
+		y = torch.stack(field_list, dim=1) #torch.Size([125, 2, 30])
+
+		g = y.mean(dim=0) 
+
+		# Now do your global pooling exactly as before:
+		# y.transpose(1,2) → shape (batch, n_output, p_fields)
+		#z_pooled = self.global_pooling(y.transpose(1,2))
+		# z_pooled: (batch, n_output, 1)
+
+		# Finally reshape to (batch, p_fields, flattened_size)
+		#g = z_pooled.view(x_input.shape[0], self.p_fields, -1)
+
+		return g.squeeze(0)  # or drop `.squeeze(0)` if you want to keep batch dim
+
+	#	print(f'Z: {z.shape}')
+	#	print(f'G: {g.shape}')
+		
+		##return g
