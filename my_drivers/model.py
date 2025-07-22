@@ -1232,11 +1232,11 @@ class Taylor_with_heads(torch.nn.Module):
 		K1 = I1 * torch.pow(I3, -1.0/3.0) - 3.0
 
 		#    K2 = I2 * I3^(–2/3) – 3.0
-		K2 = I2 * torch.pow(I3, -2.0/3.0) - 3.0
+		#K2 = I2 * torch.pow(I3, -2.0/3.0) - 3.0
+		K2 = (I1 + I3 - 1.) * torch.pow(I3,-2./3.) - 3.0 #EUCLID
 
-		#    K3 = (J - 1.0)^2
+		#    K3 = (J - 1.0)^2 OK
 		K3 = (J - 1.0)**2
-
 
 		# Concatenate feature
 		if self.centroids:
@@ -1270,7 +1270,7 @@ class Taylor_with_heads(torch.nn.Module):
 		# Stack into a tensor of shape (batch, p_fields, n_output)
 		y = torch.stack(field_list, dim=1) #torch.Size([125, 2, 30])
 
-		g = y.mean(dim=0) 
+		#g = y.mean(dim=0) 
 
 		# Now do your global pooling exactly as before:
 		# y.transpose(1,2) → shape (batch, n_output, p_fields)
@@ -1280,7 +1280,7 @@ class Taylor_with_heads(torch.nn.Module):
 		# Finally reshape to (batch, p_fields, flattened_size)
 		#g = z_pooled.view(x_input.shape[0], self.p_fields, -1)
 
-		return g.squeeze(0)  # or drop `.squeeze(0)` if you want to keep batch dim
+		return y.squeeze(0)  # or drop `.squeeze(0)` if you want to keep batch dim
 
 	#	print(f'Z: {z.shape}')
 	#	print(f'G: {g.shape}')

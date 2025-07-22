@@ -84,6 +84,7 @@ print('Beginning training\n')
 print('Training an ensemble of models...\n')
 for ensemble_iter in range(ensemble_size):
     print('\nTraining model '+str(ensemble_iter+1)+' out of '+str(ensemble_size)+'.\n')
+    #print(datasets)
     model, loss_history = train_weak(model, datasets, fem_material, noise_level)
     os.makedirs(output_dir+'/'+fem_material+'/',exist_ok=True)
     torch.save(model.state_dict(), output_dir+'/'+fem_material+'/noise='+noise_level+'_ID='+str(ensemble_iter)+'.pth')

@@ -507,3 +507,102 @@ def construct_VF_gradients_batch(V_NN: torch.Tensor, delta_xyz: torch.Tensor) ->
     ], dim=2)
 
     return grad
+
+
+def construct_vf_gradients_per_element(
+    V_NN: torch.Tensor,       # [E, p, 30]
+    delta_xyz: torch.Tensor   # [E, 3]
+) -> torch.Tensor:           # returns [E, p, 3, 3]
+    """
+    Compute ∇u_v for each element’s Taylor‐expanded virtual fields.
+
+    Args:
+      V_NN      (E×p×30): TE coeffs for p fields on E elements
+      delta_xyz (E×3)   : (x,y,z) offsets at each element
+
+    Returns:
+      grad      (E×p×3×3): gradient ∂(Vx,Vy,Vz)/∂(x,y,z) per element & field
+    """
+    E, p, K = V_NN.shape
+    assert K == 30, f"Expect 30 coeffs, got {K}"
+    # unpack offsets and make [E×1] for broadcasting
+    dx = delta_xyz[:, 0].unsqueeze(-1)  # → [E,1]
+    dy = delta_xyz[:, 1].unsqueeze(-1)
+    dz = delta_xyz[:, 2].unsqueeze(-1)
+
+    # split coeff blocks → each [E, p, 10]
+    a = V_NN[:, :,  0:10]   # Vx coeffs
+    b = V_NN[:, :, 10:20]   # Vy coeffs
+    c = V_NN[:, :, 20:30]   # Vz coeffs
+
+    # index‐shortcut
+    def coeff(block, idx):
+        # block: [E,p,10], idx in [0..9] → [E,p]
+        return block[:, :, idx]
+
+    # extract the needed coefficient slices [E,p]
+    a1, a2, a3 = coeff(a,1),  coeff(a,2),  coeff(a,3)
+    a4, a5, a6 = coeff(a,4),  coeff(a,5),  coeff(a,6)
+    a7, a8, a9 = coeff(a,7),  coeff(a,8),  coeff(a,9)
+
+    b1, b2, b3 = coeff(b,1),  coeff(b,2),  coeff(b,3)
+    b4, b5, b6 = coeff(b,4),  coeff(b,5),  coeff(b,6)
+    b7, b8, b9 = coeff(b,7),  coeff(b,8),  coeff(b,9)
+
+    c1, c2, c3 = coeff(c,1),  coeff(c,2),  coeff(c,3)
+    c4, c5, c6 = coeff(c,4),  coeff(c,5),  coeff(c,6)
+    c7, c8, c9 = coeff(c,7),  coeff(c,8),  coeff(c,9)
+
+    # now compute the analytic partials [E,p]
+    dVx_dx = a1 + 2*a4*dx +    a7*dy +    a8*dz
+    dVx_dy = a2 +    a7*dx + 2*a5*dy +    a9*dz
+    dVx_dz = a3 +    a8*dx +    a9*dy + 2*a6*dz
+
+    dVy_dx = b1 + 2*b4*dx +    b7*dy +    b8*dz
+    dVy_dy = b2 +    b7*dx + 2*b5*dy +    b9*dz
+    dVy_dz = b3 +    b8*dx +    b9*dy + 2*b6*dz
+
+    dVz_dx = c1 + 2*c4*dx +    c7*dy +    c8*dz
+    dVz_dy = c2 +    c7*dx + 2*c5*dy +    c9*dz
+    dVz_dz = c3 +    c8*dx +    c9*dy + 2*c6*dz
+
+    # stack to [E,p,3,3]
+    #  first stack each row of the Jacobian:
+    row0 = torch.stack([dVx_dx, dVx_dy, dVx_dz], dim=2)  # [E,p,3]
+    row1 = torch.stack([dVy_dx, dVy_dy, dVy_dz], dim=2)
+    row2 = torch.stack([dVz_dx, dVz_dy, dVz_dz], dim=2)
+    grad = torch.stack([row0, row1, row2], dim=2)       # [E,p,3,3]
+
+    return grad
+def evaluate_vf_values_per_element(
+    V_NN: torch.Tensor,      # [E, p, 30]
+    delta_xyz: torch.Tensor  # [E, 3]
+) -> torch.Tensor:          # returns [E, p, 3]
+    E, p, K = V_NN.shape
+    assert K == 30, "expected 30 coeffs per field"
+    # Build per-element monomial basis B[e] = [1, x, y, z, x^2, y^2, z^2, x*y, x*z, y*z]
+    x = delta_xyz[:, 0]
+    y = delta_xyz[:, 1]
+    z = delta_xyz[:, 2]
+    B = torch.stack([
+        torch.ones_like(x),
+        x, y, z,
+        x**2, y**2, z**2,
+        x*y, x*z, y*z
+    ], dim=1)                    # → [E, 10]
+
+    # Split out the x/y/z coefficient blocks:
+    Vx_coeff = V_NN[:, :,  0:10]  # [E, p, 10]
+    Vy_coeff = V_NN[:, :, 10:20]  # [E, p, 10]
+    Vz_coeff = V_NN[:, :, 20:30]  # [E, p, 10]
+
+    # Broadcast B over the p-dimension, then dot-product along that last axis:
+    #   [E, p, 10] * [E, 1, 10] → [E, p, 10], summing over dim=2 → [E, p]
+    B_exp = B.unsqueeze(1)        # [E, 1, 10]
+
+    Vx_vals = (Vx_coeff * B_exp).sum(dim=2)  # [E, p]
+    Vy_vals = (Vy_coeff * B_exp).sum(dim=2)  # [E, p]
+    Vz_vals = (Vz_coeff * B_exp).sum(dim=2)  # [E, p]
+
+    # Stack into the final [E, p, 3] tensor:
+    return torch.stack([Vx_vals, Vy_vals, Vz_vals], dim=2)

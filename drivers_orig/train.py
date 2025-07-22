@@ -134,6 +134,8 @@ def train_weak(model, datasets, fem_material, noise_level):
 
 			# Compute loss for each displacement snapshot in dataset and add them together
 			for data in datasets:
+				print("I ma here")
+				print(data.path)
 				eqb_loss, reaction_loss = computeLosses(data, model)
 				loss += eqb_loss_factor * eqb_loss + reaction_loss_factor * reaction_loss
 
