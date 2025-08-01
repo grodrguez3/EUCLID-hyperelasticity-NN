@@ -1286,3 +1286,57 @@ class Taylor_with_heads(torch.nn.Module):
 	#	print(f'G: {g.shape}')
 		
 		##return g
+
+
+
+
+class MLP(nn.Module):
+    def __init__(self, in_dim, hidden, out_dim, depth, act=nn.ReLU()):
+        super().__init__()
+        layers = []
+        layers.append(nn.Linear(in_dim, hidden))
+        layers.append(act)
+        for _ in range(depth-2):
+            layers.append(nn.Linear(hidden, hidden))
+            layers.append(act)
+        layers.append(nn.Linear(hidden, out_dim))
+        self.net = nn.Sequential(*layers)
+        
+    def forward(self, x):
+        return self.net(x)  # shape (..., out_dim)
+
+
+class DeepONet(nn.Module):
+    def __init__(self,
+                 n_branch: int,
+                 n_trunk:  int,
+                 hidden:   int,
+                 depth:    int,
+                 p:        int,
+                 act=nn.ReLU()):
+        """
+        n_branch: size of the flattened branch input (e.g. M * d_traction)
+        n_trunk:  dimension of spatial coordinate (e.g. 3 for x,y,z)
+        hidden:   width of each hidden layer
+        depth:    total layers per sub-network
+        p:        size of the shared embedding
+        act:      activation (ReLU, Tanh, etc.)
+        """
+        super().__init__()
+        self.branch_net = MLP(n_branch, hidden, p, depth, act)
+        self.trunk_net  = MLP(n_trunk,  hidden, p, depth, act)
+        self.bias       = nn.Parameter(torch.zeros(1))   # scalar bias
+
+    def forward(self,
+                x_branch: torch.Tensor,  # shape (B, n_branch)
+                x_trunk:  torch.Tensor   # shape (B, n_trunk)
+                ) -> torch.Tensor:
+        # 1) get p-dim embeddings
+        b = self.branch_net(x_branch)  # (B, p)
+        t = self.trunk_net(x_trunk)    # (B, p)
+
+        # 2) elementwise dot across the p-dim → (B,1)
+        u = (b * t).sum(dim=-1, keepdim=True)
+
+        # 3) add bias and return
+        return u + self.bias          # (B,1)

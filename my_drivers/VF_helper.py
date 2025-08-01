@@ -2,9 +2,12 @@ import torch
 
 
 def calculate_point(centroids, state):
-    delta=centroids[:,:,state] -centroids[:,:,0]
+    delta=centroids[:,:,state] #-centroids[:,:,0]
     return delta
 
+def calculate_point_all_states(centroids, state):
+    delta=centroids #[:,:,state] -centroids[:,:,0]
+    return delta
 
 def construct_VF(V_NN,delta_xyz):
     Vf = (

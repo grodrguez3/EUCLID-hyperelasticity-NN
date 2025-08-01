@@ -429,3 +429,72 @@ def map_facets_to_elements(connectivity, facets):
             }
 
     return mapping
+
+def transform_to_invariants(x):
+	# For clarity, we slice out each component as a (batch_size×1) tensor:
+	F11 = x[:, 0:1]  # shape = (B,1)
+	F12 = x[:, 1:2]
+	F13 = x[:, 2:3]
+
+	F21 = x[:, 3:4]
+	F22 = x[:, 4:5]
+	F23 = x[:, 5:6]
+
+	F31 = x[:, 6:7]
+	F32 = x[:, 7:8]
+	F33 = x[:, 8:9]
+	
+
+	# 1) Build the Right Cauchy‐Green tensor C = F^T F, component‐wise:
+	#    C11 = F11^2 + F21^2 + F31^2
+	C11 = F11**2 + F21**2 + F31**2
+
+	#    C12 = F11·F12 + F21·F22 + F31·F32
+	C12 = F11*F12 + F21*F22 + F31*F32
+
+	#    C13 = F11·F13 + F21·F23 + F31·F33
+	C13 = F11*F13 + F21*F23 + F31*F33
+
+	#    C22 = F12^2 + F22^2 + F32^2
+	C22 = F12**2 + F22**2 + F32**2
+
+	#    C23 = F12·F13 + F22·F23 + F32·F33
+	C23 = F12*F13 + F22*F23 + F32*F33
+
+	#    C33 = F13^2 + F23^2 + F33^2
+	C33 = F13**2 + F23**2 + F33**2
+
+	# (Note: C21 = C12, C31 = C13, C32 = C23, but we only need them for invariants.)
+
+	# 2) Compute the three invariants of C:
+
+	#   I1 = trace(C) = C11 + C22 + C33
+	I1 = C11 + C22 + C33
+
+	#   I2 = sum of principal 2×2 minors of C:
+	#        I2 =  C11·C22 + C11·C33 + C22·C33  –  (C12^2 + C13^2 + C23^2)
+	I2 = (C11 * C22) + (C11 * C33) + (C22 * C33) - (C12**2 + C13**2 + C23**2)
+
+	#   I3 = det(C).  But det(C) = (det F)².  So first form det(F):
+	detF = (
+		F11 * (F22*F33 - F23*F32)
+	- F12 * (F21*F33 - F23*F31)
+	+ F13 * (F21*F32 - F22*F31)
+	)
+	I3 = detF**2
+
+	# 3) Now form the modified invariants K1, K2, K3:
+
+	#    J  = sqrt(I3)
+	J = torch.sqrt(I3)
+
+	#    K1 = I1 * I3^(–1/3) – 3.0
+	K1 = I1 * torch.pow(I3, -1.0/3.0) - 3.0
+
+	#    K2 = I2 * I3^(–2/3) – 3.0
+	K2 = I2 * torch.pow(I3, -2.0/3.0) - 3.0
+
+	#    K3 = (J - 1.0)^2
+	K3 = (J - 1.0)**2
+	
+	return torch.cat((K1,K2,K3),dim=1).float()
